@@ -159,6 +159,7 @@ server/src/
 ├── routes/                # auth, patient, visit, recall, import, setting, health
 ├── controllers/           # one per route file
 ├── services/              # auth, patient, visit, recall, import, setting
+├── scripts/reset-password.js  # admin CLI, not an HTTP route — see §5.2
 ├── domain/recallRules.js  # §4.3 — pure, no imports from services/prisma
 ├── validators/            # Zod schemas per resource
 ├── middleware/            # auth, validate(schema), error, requestLogger
@@ -183,7 +184,7 @@ All routes are under `/api`, and all except `auth/login` and `health` require th
 | `POST /auth/login` | Sets the JWT cookie (12 h). Rate-limited (10 attempts / 15 min / IP) |
 | `POST /auth/logout` | Clears the cookie |
 | `GET /auth/me` | Session check for the client |
-| `PATCH /auth/password` | `{ currentPassword, newPassword }` |
+| `PATCH /auth/password` | `{ currentPassword, newPassword }`. Requires knowing the current password |
 | `GET /patients?search=&status=&page=` | Paginated, 50 per page. `search` matches part of the name, part of the phone digits, or an exact birth date. `status` filters by current recall status |
 | `GET /patients/:id` | Patient + current recall (with computed `nextAction`) + visits + recall events, newest first |
 | `POST /patients` | `{ ...patient, registerVisitToday?: bool }`. A duplicate `(name, birthDate)` → 409 with `existingPatientId` |
@@ -206,6 +207,8 @@ What the secondary lists contain:
 - `confirmed-no-show`: status `CONFIRMED` and `dueDate < today`.
 - `import-overdue`: `onHold = true`.
 - `unreachable`: status `UNREACHABLE`, sorted by most recently updated.
+
+**Password recovery.** There is no "forgot password" flow in the UI — with one shared account there is nobody for it to email. Passwords stay bcrypt-hashed per SPEC.md §4.4 (never stored or logged in plain text). If the clinic forgets it, the developer runs `node server/src/scripts/reset-password.js <new-password>` against the production database (e.g. `railway run`), which hashes and overwrites the one `User` row directly — no API route, so it can't be hit over HTTP.
 
 ### 5.3 Transactions and concurrency
 
