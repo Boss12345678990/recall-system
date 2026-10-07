@@ -1,0 +1,11 @@
+{
+  "name": "recall-system",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "workspaces": ["server"],
+  "scripts": {
+    "dev:server": "npm run dev -w server",
+    "test": "npm test -w server"
+  }
+}
