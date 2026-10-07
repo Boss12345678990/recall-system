@@ -15,6 +15,9 @@ export const MAX_IMPORT_ROWS = 5000
 const HEADER_OF = Object.fromEntries(IMPORT_COLUMNS.map((column) => [column.key, column.header]))
 const DATE_FORMAT_MESSAGE = '日期格式錯誤（例：1990-01-31 或 79/1/31）'
 const EXCEL_EPOCH_OFFSET_DAYS = 25569 // days from 1899-12-30 to 1970-01-01
+// Serials below 10000 (before 1927-05-18) are almost certainly a typed year or number, not a date.
+const MIN_DATE_SERIAL = 10000
+const MAX_DATE_SERIAL = 2958465
 const MS_PER_DAY = 86_400_000
 const ROC_YEAR_OFFSET = 1911
 const YES = new Set(['是', '有', 'y', 'yes', 'true', '1', 'v'])
@@ -32,7 +35,7 @@ function toDateString(year, month, day) {
 export function parseDateValue(value) {
   if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value.toISOString().slice(0, 10)
   if (typeof value === 'number') {
-    if (!Number.isFinite(value) || value < 1 || value > 2958465) return null
+    if (!Number.isFinite(value) || value < MIN_DATE_SERIAL || value > MAX_DATE_SERIAL) return null
     return new Date(Math.round((value - EXCEL_EPOCH_OFFSET_DAYS) * MS_PER_DAY)).toISOString().slice(0, 10)
   }
   if (typeof value !== 'string') return null

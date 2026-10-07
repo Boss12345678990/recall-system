@@ -13,6 +13,10 @@ describe('parseDateValue', () => {
     ['115/10/06', '2026-10-06'],
   ])('parses %s', (input, expected) => expect(parseDateValue(input)).toBe(expected))
 
+  it.each([1990, 79, 9999])('rejects the bare number %s rather than reading it as an Excel serial', (input) => {
+    expect(parseDateValue(input)).toBeNull()
+  })
+
   it.each(['2026-02-30', 'abc', '', null, '1990-1'])('rejects %s', (input) => {
     expect(parseDateValue(input)).toBeNull()
   })

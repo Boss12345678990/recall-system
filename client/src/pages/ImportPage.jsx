@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router'
 import Button from '../components/Button.jsx'
+import { ErrorRows, ValidRows } from '../components/ImportPreviewRows.jsx'
 import { useCommitImport, usePreviewImport } from '../hooks/useImport.js'
 import { formatDate } from '../utils/format.js'
 
@@ -62,16 +63,11 @@ export default function ImportPage() {
           {errorRows.length > 0 && (
             <div className="mt-6">
               <p className="text-sm font-medium text-red-600">以下資料有錯誤，請修正 Excel 後重新上傳，或直接匯入其他正確的資料：</p>
-              <ul className="mt-3 space-y-2 text-sm">
-                {errorRows.map((row) => (
-                  <li key={row.rowNumber}>
-                    第 {row.rowNumber} 列{row.raw.name && `（${row.raw.name}）`}：
-                    {row.errors.map((error) => `${error.column}${error.message}`).join('、')}
-                  </li>
-                ))}
-              </ul>
+              <ErrorRows rows={errorRows} />
             </div>
           )}
+
+          {validRows.length > 0 && <ValidRows rows={validRows} />}
 
           {duplicateRows.length > 0 && (
             <details className="mt-6 text-sm">

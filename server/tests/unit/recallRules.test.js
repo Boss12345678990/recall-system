@@ -167,6 +167,14 @@ describe('applyManualEdit', () => {
     const { patch } = applyManualEdit(recall(), { dueDate: '2026-11-01' }, TODAY)
     expect(patch).toEqual({ ...snapshot(recall()), dueDate: '2026-11-01' })
   })
+  it('takes an on-hold recall off hold when given a due date from today on', () => {
+    const { patch } = applyManualEdit(recall({ onHold: true, dueDate: '2026-01-01' }), { dueDate: '2026-10-13' }, TODAY)
+    expect(patch).toMatchObject({ dueDate: '2026-10-13', onHold: false })
+  })
+  it('keeps an on-hold recall on hold when the new due date is still in the past', () => {
+    const { patch } = applyManualEdit(recall({ onHold: true, dueDate: '2026-01-01' }), { dueDate: '2026-02-01' }, TODAY)
+    expect(patch.onHold).toBe(true)
+  })
   it('refuses to edit a completed recall', () => {
     expect(applyManualEdit(recall({ status: 'COMPLETED' }), { dueDate: '2026-11-01' }, TODAY))
       .toEqual({ error: 'RECALL_COMPLETED' })

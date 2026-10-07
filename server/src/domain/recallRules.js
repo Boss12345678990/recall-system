@@ -84,7 +84,11 @@ export function applyAction(recall, hasLine, action, today) {
 export function applyManualEdit(recall, changes, today) {
   if (recall.status === 'COMPLETED') return { error: 'RECALL_COMPLETED' }
   const next = snapshot(recall)
-  if (changes.dueDate !== undefined) next.dueDate = changes.dueDate
+  if (changes.dueDate !== undefined) {
+    next.dueDate = changes.dueDate
+    // A held import becomes trackable again once staff give it a due date that has not passed.
+    if (next.onHold && changes.dueDate >= today) next.onHold = false
+  }
   if (changes.step !== undefined && changes.step !== recall.step) {
     const target = STEPS.indexOf(changes.step)
     STEPS.forEach((step, index) => {
