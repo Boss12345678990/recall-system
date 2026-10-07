@@ -5,6 +5,7 @@ import { patientFromDb, patientFieldsToDb, visitFromDb } from '../mappers/patien
 import { recallFromDb, eventFromDb } from '../mappers/recall.mapper.js'
 import { withNextAction } from '../domain/recallRules.js'
 import { getSettings } from './setting.service.js'
+import { recordVisitInTx } from './visit.service.js'
 
 export const PAGE_SIZE = 50
 const CURRENT_RECALL = { where: { status: { not: 'COMPLETED' } }, take: 1 }
@@ -75,10 +76,12 @@ async function assertNoDuplicate(db, name, birthDate, excludeId) {
   }
 }
 
-export async function createPatient(input) {
+export async function createPatient({ registerVisitToday, ...input }) {
+  const today = todayInClinic()
   const id = await prisma.$transaction(async (tx) => {
     await assertNoDuplicate(tx, input.name, input.birthDate)
     const row = await tx.patient.create({ data: patientFieldsToDb(input) })
+    if (registerVisitToday) await recordVisitInTx(tx, row.id, { visitDate: today, note: null }, today)
     return row.id
   })
   return getPatient(id)

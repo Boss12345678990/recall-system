@@ -17,6 +17,7 @@ export const createPatientSchema = requestSchema({
     phoneNumber,
     birthDate: pastOrTodayDate,
     hasLine: z.boolean().default(true),
+    registerVisitToday: z.boolean().default(false),
     comment: commentText.optional(),
   }).strict(),
 })
