@@ -4,7 +4,23 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project status
 
-Pre-implementation. The only source of requirements so far is [SPEC.md](SPEC.md) plus the design decisions below, which were agreed with the user after SPEC.md was written and **override it where they conflict**. No code, build, lint or test commands exist yet — add them here once `server/` and `client/` are scaffolded.
+v1 implemented per [the design spec](docs/superpowers/specs/2026-10-06-dental-recall-system-design.md) and [plan](docs/superpowers/plans/2026-10-06-dental-recall-system.md). The decisions below override [SPEC.md](SPEC.md) where they conflict.
+
+## Commands (run from the repo root)
+
+- First-time setup: `npm install`; copy `server/.env.example` → `server/.env` and `server/.env.test.example` → `server/.env.test` (test DB name must contain `test`); `npm run db:migrate -w server`; `npm run db:seed -w server`
+- Dev: `npm run dev:server` (API on :3000) and `npm run dev:client` (Vite on :5173, proxies `/api`)
+- All tests: `npm test` · server unit only: `npm run test:unit -w server` · server integration: `npm run test:integration -w server` (runs `prisma migrate deploy` on the test DB, then each test empties the tables) · client: `npm test -w client`
+- One test: `cd server && npx vitest run tests/unit/recallRules.test.js -t "counts call 1"` (same pattern in `client/`)
+- New migration after editing `server/prisma/schema.prisma`: `npm run db:migrate -w server -- --name <name>`
+- Production: `npm run build && npm start` (start runs `prisma migrate deploy` first)
+- Forgotten password: `npm run reset-password -w server -- <new-password>` against the target database (on Railway: `railway run npm run reset-password -w server -- <new-password>`)
+
+## Deployment (Railway)
+
+One service from the repo root: build `npm run build`, start `npm start`, health check `/api/health`, restart on failure. Add a Railway MySQL and set `DATABASE_URL` (the MySQL service's URL), `JWT_SECRET` (32+ random chars) and `NODE_ENV=production`; run `railway run npm run db:seed -w server` once with `ADMIN_USERNAME`/`ADMIN_PASSWORD` set.
+
+Name ordering uses `zh-Hant-TW` collation, which sorts by stroke count (乙 before 甲).
 
 ## What this is
 
