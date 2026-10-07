@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { nextAction, overdueDays, buildTodayItems } from '../../src/domain/recallRules.js'
+import {
+  nextAction, overdueDays, buildTodayItems, applyAction, applyManualEdit, canRestart, restartFields, snapshot,
+} from '../../src/domain/recallRules.js'
 
 const SETTINGS = { recallIntervalMonths: 6, lineLeadDays: 7, callAfterLineDays: 3, callGapDays: 2 }
 
@@ -90,5 +92,105 @@ describe('buildTodayItems', () => {
     const names = buildTodayItems(items, SETTINGS, TODAY).map((i) => i.patient.name)
     // zh-Hant-TW collates by stroke count: 乙 (1 stroke) before 甲 (5).
     expect(names).toEqual(['較逾期', '乙', '甲', '較近', '較遠'])
+  })
+})
+
+describe('applyAction', () => {
+  const TODAY = '2026-10-06'
+
+  it('records LINE sent from NOT_CONTACTED', () => {
+    expect(applyAction(recall(), true, 'LINE_SENT', TODAY)).toEqual({ step: 'LINE_SENT', lineSentAt: TODAY })
+  })
+  it('refuses LINE for patients without LINE', () => {
+    expect(applyAction(recall(), false, 'LINE_SENT', TODAY)).toBeNull()
+  })
+  it('refuses LINE once a call has been made', () => {
+    expect(applyAction(recall({ step: 'CALLED_1' }), true, 'LINE_SENT', TODAY)).toBeNull()
+  })
+  it.each([
+    ['LINE_SENT', { step: 'CALLED_1', call1At: '2026-10-06' }],
+    ['CALLED_1', { step: 'CALLED_2', call2At: '2026-10-06' }],
+    ['CALLED_2', { step: 'CALLED_3', call3At: '2026-10-06', status: 'UNREACHABLE' }],
+  ])('advances a no-answer call from %s', (step, expected) => {
+    expect(applyAction(recall({ step }), true, 'CALL_NO_ANSWER', TODAY)).toEqual(expected)
+  })
+  it('lets patients without LINE be called from NOT_CONTACTED', () => {
+    expect(applyAction(recall(), false, 'CALL_NO_ANSWER', TODAY)).toEqual({ step: 'CALLED_1', call1At: TODAY })
+  })
+  it('refuses a call before LINE was sent to a LINE patient', () => {
+    expect(applyAction(recall(), true, 'CALL_NO_ANSWER', TODAY)).toBeNull()
+  })
+  it('refuses a call after call 3', () => {
+    expect(applyAction(recall({ step: 'CALLED_3' }), true, 'CALL_NO_ANSWER', TODAY)).toBeNull()
+  })
+  it('confirms from any step', () => {
+    expect(applyAction(recall({ step: 'CALLED_2' }), true, 'CONFIRM', TODAY))
+      .toEqual({ status: 'CONFIRMED', confirmedAt: TODAY })
+  })
+  it.each([[{ status: 'CONFIRMED' }], [{ status: 'UNREACHABLE' }], [{ onHold: true }]])(
+    'refuses every action when %o', (overrides) => {
+      expect(applyAction(recall(overrides), true, 'CONFIRM', TODAY)).toBeNull()
+    },
+  )
+})
+
+describe('applyManualEdit', () => {
+  const TODAY = '2026-10-06'
+
+  it('fills missing step dates with today when moving forward', () => {
+    const { patch } = applyManualEdit(recall({ step: 'LINE_SENT', lineSentAt: '2026-10-01' }), { step: 'CALLED_2' }, TODAY)
+    expect(patch).toMatchObject({ step: 'CALLED_2', lineSentAt: '2026-10-01', call1At: TODAY, call2At: TODAY, call3At: null })
+  })
+  it('clears later step dates when moving backward', () => {
+    const start = recall({ step: 'CALLED_2', lineSentAt: '2026-10-01', call1At: '2026-10-03', call2At: '2026-10-05' })
+    const { patch } = applyManualEdit(start, { step: 'LINE_SENT' }, TODAY)
+    expect(patch).toMatchObject({ step: 'LINE_SENT', lineSentAt: '2026-10-01', call1At: null, call2At: null })
+  })
+  it('marks UNREACHABLE when moved to call 3 without an explicit status', () => {
+    const { patch } = applyManualEdit(recall({ step: 'CALLED_2' }), { step: 'CALLED_3' }, TODAY)
+    expect(patch).toMatchObject({ step: 'CALLED_3', status: 'UNREACHABLE' })
+  })
+  it('rejects PENDING together with call 3', () => {
+    expect(applyManualEdit(recall({ step: 'CALLED_3', status: 'UNREACHABLE' }), { status: 'PENDING' }, TODAY))
+      .toEqual({ error: 'PENDING_AT_CALLED_3' })
+  })
+  it('allows PENDING when the step moves back at the same time', () => {
+    const start = recall({ step: 'CALLED_3', status: 'UNREACHABLE', call1At: '2026-10-01', call2At: '2026-10-03', call3At: '2026-10-05' })
+    const { patch } = applyManualEdit(start, { status: 'PENDING', step: 'CALLED_2' }, TODAY)
+    expect(patch).toMatchObject({ status: 'PENDING', step: 'CALLED_2', call3At: null })
+  })
+  it('sets confirmedAt when confirming', () => {
+    expect(applyManualEdit(recall(), { status: 'CONFIRMED' }, TODAY).patch)
+      .toMatchObject({ status: 'CONFIRMED', confirmedAt: TODAY })
+  })
+  it('changes only the due date', () => {
+    const { patch } = applyManualEdit(recall(), { dueDate: '2026-11-01' }, TODAY)
+    expect(patch).toEqual({ ...snapshot(recall()), dueDate: '2026-11-01' })
+  })
+  it('refuses to edit a completed recall', () => {
+    expect(applyManualEdit(recall({ status: 'COMPLETED' }), { dueDate: '2026-11-01' }, TODAY))
+      .toEqual({ error: 'RECALL_COMPLETED' })
+  })
+})
+
+describe('restart', () => {
+  const TODAY = '2026-10-06'
+
+  it.each([
+    ['on hold', { onHold: true }, true],
+    ['unreachable', { status: 'UNREACHABLE', step: 'CALLED_3' }, true],
+    ['confirmed but past due', { status: 'CONFIRMED', dueDate: '2026-10-05' }, true],
+    ['confirmed and due today', { status: 'CONFIRMED', dueDate: '2026-10-06' }, false],
+    ['pending', {}, false],
+    ['completed', { status: 'COMPLETED' }, false],
+  ])('canRestart when %s', (label, overrides, expected) => {
+    expect(canRestart(recall(overrides), TODAY)).toBe(expected)
+  })
+
+  it('restartFields resets the cycle', () => {
+    expect(restartFields('2026-10-13')).toEqual({
+      dueDate: '2026-10-13', step: 'NOT_CONTACTED', status: 'PENDING', lineSentAt: null,
+      call1At: null, call2At: null, call3At: null, confirmedAt: null, onHold: false,
+    })
   })
 })
