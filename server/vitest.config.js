@@ -10,6 +10,17 @@ export default defineConfig({
     fileParallelism: false,
     projects: [
       { extends: true, test: { name: 'unit', include: ['tests/unit/**/*.test.js'] } },
+      {
+        extends: true,
+        test: {
+          name: 'integration',
+          include: ['tests/integration/**/*.test.js'],
+          globalSetup: ['tests/integration/globalSetup.js'],
+          setupFiles: ['tests/integration/setup.js'],
+          hookTimeout: 60_000,
+          testTimeout: 30_000,
+        },
+      },
     ],
   },
 })
