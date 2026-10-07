@@ -6,6 +6,8 @@ import DashboardPage from './pages/DashboardPage.jsx'
 import RecallListPage from './pages/RecallListPage.jsx'
 import PatientsPage from './pages/PatientsPage.jsx'
 import PatientDetailPage from './pages/PatientDetailPage.jsx'
+import ImportPage from './pages/ImportPage.jsx'
+import SettingsPage from './pages/SettingsPage.jsx'
 
 export default function App() {
   return (
@@ -16,6 +18,8 @@ export default function App() {
         <Route path="lists/:list" element={<RecallListPage />} />
         <Route path="patients" element={<PatientsPage />} />
         <Route path="patients/:id" element={<PatientDetailPage />} />
+        <Route path="import" element={<ImportPage />} />
+        <Route path="settings" element={<SettingsPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
