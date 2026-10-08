@@ -32,9 +32,9 @@ describe('GET /api/recalls/today', () => {
     await patientWithRecall({ dueDate: addDays(today, -30), onHold: true }, { name: '己' })
 
     const { data } = (await agent.get('/api/recalls/today').expect(200)).body
-    expect(data.items.map((i) => i.patient.name)).toEqual(['丙', '乙', '甲'])
+    expect(data.items.map((i) => i.patient.name)).toEqual(['乙', '丙', '甲'])
     expect(data.summary).toEqual({ total: 3, overdue: 1 })
-    expect(data.items[0].nextAction).toEqual({ action: 'CALL_1', actionDate: addDays(today, -2), overdueDays: 2 })
+    expect(data.items[1].nextAction).toEqual({ action: 'CALL_1', actionDate: addDays(today, -2), overdueDays: 2 })
     expect(data.counts).toEqual({ waiting: 0, confirmed: 1, unreachable: 0, 'import-overdue': 1 })
     expect(data.progress).toEqual({ done: 0, total: 3 })
   })

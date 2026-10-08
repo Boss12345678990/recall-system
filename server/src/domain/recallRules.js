@@ -36,15 +36,12 @@ export function withNextAction(recall, hasLine, settings, today) {
   return { ...recall, nextAction: next && { ...next, overdueDays: overdueDays(next.actionDate, today) } }
 }
 
+// Most urgent first = smallest countdown: the earliest due date (overdue ones first).
+// Ties go to the later contact step (call 3 > call 2 > call 1 > LINE), then to the name.
 export function compareUrgency(a, b) {
-  const aOverdue = a.nextAction.overdueDays > 0
-  const bOverdue = b.nextAction.overdueDays > 0
-  if (aOverdue !== bOverdue) return aOverdue ? -1 : 1
+  if (a.dueDate !== b.dueDate) return a.dueDate < b.dueDate ? -1 : 1
   const byRank = ACTION_RANK[b.nextAction.action] - ACTION_RANK[a.nextAction.action]
   if (byRank !== 0) return byRank
-  const byOverdue = b.nextAction.overdueDays - a.nextAction.overdueDays
-  if (byOverdue !== 0) return byOverdue
-  if (a.dueDate !== b.dueDate) return a.dueDate < b.dueDate ? -1 : 1
   return a.patient.name.localeCompare(b.patient.name, 'zh-Hant-TW')
 }
 

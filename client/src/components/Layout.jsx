@@ -5,12 +5,28 @@ import { useToday } from '../hooks/useRecalls.js'
 
 export const CLINIC_NAME = '微笑牙醫診所'
 
+function Icon({ children }) {
+  return (
+    <svg aria-hidden viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4 shrink-0">
+      {children}
+    </svg>
+  )
+}
+
 function GearIcon() {
   return (
-    <svg aria-hidden viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5">
+    <Icon>
       <path strokeLinecap="round" strokeLinejoin="round" d="M10.3 4.3c.4-1.7 3-1.7 3.4 0a1.7 1.7 0 0 0 2.6 1.1c1.5-.9 3.3.9 2.4 2.4a1.7 1.7 0 0 0 1 2.6c1.8.4 1.8 3 0 3.4a1.7 1.7 0 0 0-1 2.6c.9 1.5-.9 3.3-2.4 2.4a1.7 1.7 0 0 0-2.6 1c-.4 1.8-3 1.8-3.4 0a1.7 1.7 0 0 0-2.6-1c-1.5.9-3.3-.9-2.4-2.4a1.7 1.7 0 0 0-1-2.6c-1.8-.4-1.8-3 0-3.4a1.7 1.7 0 0 0 1-2.6c-.9-1.5.9-3.3 2.4-2.4a1.7 1.7 0 0 0 2.6-1.1Z" />
       <circle cx="12" cy="12" r="3" />
-    </svg>
+    </Icon>
+  )
+}
+
+function LogoutIcon() {
+  return (
+    <Icon>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 16l-4-4 4-4M6 12h10" />
+    </Icon>
   )
 }
 
@@ -41,15 +57,15 @@ export default function Layout() {
           </nav>
           <div className="ml-auto">
             <DropdownMenu
-              label={<GearIcon />}
+              label="更多選項"
               ariaLabel="設定"
               caret={false}
               buttonClassName="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
             >
               {(close) => (
                 <>
-                  <MenuItem onClick={() => { close(); navigate('/settings') }}>設定</MenuItem>
-                  <MenuItem onClick={() => { close(); logout.mutate() }}>登出</MenuItem>
+                  <MenuItem icon={<GearIcon />} onClick={() => { close(); navigate('/settings') }}>設定</MenuItem>
+                  <MenuItem icon={<LogoutIcon />} onClick={() => { close(); logout.mutate(undefined, { onSettled: () => navigate('/login', { replace: true }) }) }}>登出</MenuItem>
                 </>
               )}
             </DropdownMenu>

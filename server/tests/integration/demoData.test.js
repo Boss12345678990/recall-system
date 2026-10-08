@@ -16,10 +16,10 @@ describe('seedDemoData', () => {
     const { data } = (await agent.get('/api/recalls/today').expect(200)).body
     expect(data.items.map((i) => [i.patient.name, i.nextAction.action, i.nextAction.overdueDays])).toEqual([
       ['吳雅婷', 'CALL_3', 2],
-      ['李美玲', 'CALL_1', 1],
-      ['陳淑芬', 'SEND_LINE', 2],
       ['黃建國', 'CALL_2', 0],
+      ['李美玲', 'CALL_1', 1],
       ['張家豪', 'CALL_1', 0],
+      ['陳淑芬', 'SEND_LINE', 2],
       ['王秀英', 'CALL_1', 0],
       ['林志明', 'SEND_LINE', 0],
     ])

@@ -43,7 +43,7 @@ An internal recall (回診追蹤) system for a small dental clinic, used by 2–
   - Offsets are computed from the **actual** date the previous step was recorded, not the planned date.
 - **Recall statuses** (exactly four): `未確認` (default, in progress) · `確認複診` · `聯絡不上` (also used manually when a patient declines) · `已回診` (patient came back; a new recall cycle starts).
 - Staff can manually change both step and status; every change is recorded in a history/event table.
-- **Today's to-do list is computed on read** from step + dates — no cron jobs or background workers. Urgency order: overdue first, then call 3 > call 2 > call 1 > LINE; ties broken by nearest due date.
+- **Today's to-do list is computed on read** from step + dates — no cron jobs or background workers. Urgency order = the 倒數 (countdown): earliest due date first (overdue ones on top); ties go to the later contact step (call 3 > call 2 > call 1 > LINE), then name.
 - The dashboard has five tabs: 待辦 (today's to-do), 等待回覆 (contacted, next step not yet due), 已確認 (all `確認複診`; past-due ones — 確認但未到 — sort first with a red 逾期 badge), 無法聯絡, 待重新追蹤 (imports held because they were past due).
 - **改約 (reschedule)** reuses the restart endpoint: any recall except `已回診` can get a new due date, and its reminders start over from 傳 LINE. The event note records 「改約至 YYYY/MM/DD」.
 - **Notifications are in-app only** (dashboard summary + red highlighting), no desktop/push notifications.

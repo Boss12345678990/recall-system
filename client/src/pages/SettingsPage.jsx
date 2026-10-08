@@ -44,41 +44,41 @@ function RecallSettingsForm({ settings }) {
 }
 
 function PasswordForm() {
-  const changePassword = useChangePassword()
-  const toast = useToast()
-  const empty = { currentPassword: '', newPassword: '', confirmPassword: '' }
-  const [form, setForm] = useState(empty)
-  const mismatch = form.confirmPassword !== '' && form.newPassword !== form.confirmPassword
+  // const changePassword = useChangePassword()
+  // const toast = useToast()
+  // const empty = { currentPassword: '', newPassword: '', confirmPassword: '' }
+  // const [form, setForm] = useState(empty)
+  // const mismatch = form.confirmPassword !== '' && form.newPassword !== form.confirmPassword
 
-  const submit = (event) => {
-    event.preventDefault()
-    if (mismatch) return
-    changePassword.mutate(
-      { currentPassword: form.currentPassword, newPassword: form.newPassword },
-      { onSuccess: () => { setForm(empty); toast.show({ message: '密碼已更新' }) } },
-    )
-  }
-  const update = (key) => (event) => setForm({ ...form, [key]: event.target.value })
+  // const submit = (event) => {
+  //   event.preventDefault()
+  //   if (mismatch) return
+  //   changePassword.mutate(
+  //     { currentPassword: form.currentPassword, newPassword: form.newPassword },
+  //     { onSuccess: () => { setForm(empty); toast.show({ message: '密碼已更新' }) } },
+  //   )
+  // }
+  // const update = (key) => (event) => setForm({ ...form, [key]: event.target.value })
 
-  return (
-    <form className="space-y-5" onSubmit={submit}>
-      <div className="grid gap-5 sm:grid-cols-3">
-        <Field label="目前密碼">
-          <input className={inputClass} type="password" autoComplete="current-password" required value={form.currentPassword} onChange={update('currentPassword')} />
-        </Field>
-        <Field label="新密碼" hint="至少 8 個字元">
-          <input className={inputClass} type="password" autoComplete="new-password" required value={form.newPassword} onChange={update('newPassword')} />
-        </Field>
-        <Field label="再輸入一次新密碼" error={mismatch ? '兩次輸入的新密碼不一致' : undefined}>
-          <input className={inputClass} type="password" autoComplete="new-password" required value={form.confirmPassword} onChange={update('confirmPassword')} />
-        </Field>
-      </div>
-      {changePassword.error && <p className="text-sm text-red-600">{changePassword.error.message}</p>}
-      <div className="flex justify-end">
-        <Button type="submit" disabled={mismatch || changePassword.isPending}>更新密碼</Button>
-      </div>
-    </form>
-  )
+  // return (
+  //   <form className="space-y-5" onSubmit={submit}>
+  //     <div className="grid gap-5 sm:grid-cols-3">
+  //       <Field label="目前密碼">
+  //         <input className={inputClass} type="password" autoComplete="current-password" required value={form.currentPassword} onChange={update('currentPassword')} />
+  //       </Field>
+  //       <Field label="新密碼" hint="至少 8 個字元">
+  //         <input className={inputClass} type="password" autoComplete="new-password" required value={form.newPassword} onChange={update('newPassword')} />
+  //       </Field>
+  //       <Field label="再輸入一次新密碼" error={mismatch ? '兩次輸入的新密碼不一致' : undefined}>
+  //         <input className={inputClass} type="password" autoComplete="new-password" required value={form.confirmPassword} onChange={update('confirmPassword')} />
+  //       </Field>
+  //     </div>
+  //     {changePassword.error && <p className="text-sm text-red-600">{changePassword.error.message}</p>}
+  //     <div className="flex justify-end">
+  //       <Button type="submit" disabled={mismatch || changePassword.isPending}>更新密碼</Button>
+  //     </div>
+  //   </form>
+  // )
 }
 
 export default function SettingsPage() {
@@ -93,10 +93,10 @@ export default function SettingsPage() {
         <h2 className="mb-5 font-semibold">回診提醒</h2>
         <RecallSettingsForm settings={settings.data} />
       </section>
-      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      {/* <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <h2 className="mb-5 font-semibold">修改登入密碼</h2>
         <PasswordForm />
-      </section>
+      </section> */}
     </div>
   )
 }

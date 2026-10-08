@@ -11,7 +11,7 @@ import { getSettings } from './setting.service.js'
 const LIST_QUERIES = {
   waiting: { where: { status: 'PENDING', onHold: false, step: { not: 'NOT_CONTACTED' } }, orderBy: [{ dueDate: 'asc' }, { id: 'asc' }] },
   confirmed: { where: { status: 'CONFIRMED' }, orderBy: [{ dueDate: 'asc' }, { id: 'asc' }] },
-  unreachable: { where: { status: 'UNREACHABLE' }, orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }] },
+  unreachable: { where: { status: 'UNREACHABLE' }, orderBy: [{ dueDate: 'asc' }, { id: 'asc' }] },
   'import-overdue': { where: { onHold: true, status: 'PENDING' }, orderBy: [{ dueDate: 'asc' }, { id: 'asc' }] },
 }
 

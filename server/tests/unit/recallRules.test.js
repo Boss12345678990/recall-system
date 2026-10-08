@@ -69,29 +69,27 @@ describe('buildTodayItems', () => {
     expect(result[0].nextAction).toEqual({ action: 'SEND_LINE', actionDate: TODAY, overdueDays: 0 })
   })
 
-  it('puts overdue first, then call 3 > call 2 > call 1 > LINE', () => {
+  it('sorts by countdown: the earliest due date first, whatever the step', () => {
     const items = [
+      item('第1次', { step: 'LINE_SENT', lineSentAt: '2026-10-03', dueDate: '2026-10-20' }),
       item('LINE', { dueDate: '2026-10-13' }),
-      item('第1次', { step: 'LINE_SENT', lineSentAt: '2026-10-03', dueDate: '2026-10-10' }),
       item('第3次', { step: 'CALLED_2', call2At: '2026-10-04', dueDate: '2026-10-09' }),
-      item('第2次', { step: 'CALLED_1', call1At: '2026-10-04', dueDate: '2026-10-08' }),
-      item('逾期LINE', { dueDate: '2026-10-12' }),
+      item('逾期LINE', { dueDate: '2026-10-07' }),
     ]
     const names = buildTodayItems(items, SETTINGS, TODAY).map((i) => i.patient.name)
-    expect(names).toEqual(['逾期LINE', '第3次', '第2次', '第1次', 'LINE'])
+    expect(names).toEqual(['逾期LINE', '第3次', 'LINE', '第1次'])
   })
 
-  it('breaks ties by more overdue days, then nearer due date, then name', () => {
+  it('breaks due-date ties by the later contact step first, then name', () => {
     const items = [
-      item('乙', { dueDate: '2026-10-11' }),
-      item('甲', { dueDate: '2026-10-11' }),
-      item('較逾期', { dueDate: '2026-10-10' }),
-      item('較近', { step: 'LINE_SENT', lineSentAt: '2026-10-03', dueDate: '2026-10-08' }),
-      item('較遠', { step: 'LINE_SENT', lineSentAt: '2026-10-03', dueDate: '2026-10-09' }),
+      item('乙', { dueDate: '2026-10-13' }),
+      item('甲', { dueDate: '2026-10-13' }),
+      item('第2次', { step: 'CALLED_1', call1At: '2026-10-04', dueDate: '2026-10-13' }),
+      item('第1次', { step: 'LINE_SENT', lineSentAt: '2026-10-03', dueDate: '2026-10-13' }),
     ]
     const names = buildTodayItems(items, SETTINGS, TODAY).map((i) => i.patient.name)
     // zh-Hant-TW collates by stroke count: 乙 (1 stroke) before 甲 (5).
-    expect(names).toEqual(['較逾期', '乙', '甲', '較近', '較遠'])
+    expect(names).toEqual(['第2次', '第1次', '乙', '甲'])
   })
 })
 

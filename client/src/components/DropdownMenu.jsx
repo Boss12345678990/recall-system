@@ -44,14 +44,15 @@ export default function DropdownMenu({ label, ariaLabel, caret = true, disabled 
   )
 }
 
-export function MenuItem({ onClick, tone = 'default', children }) {
+export function MenuItem({ onClick, tone = 'default', icon, children }) {
   return (
     <button
       type="button"
       role="menuitem"
       onClick={onClick}
-      className={`block w-full whitespace-nowrap rounded-lg px-3 py-2 text-left hover:bg-slate-50 ${tone === 'danger' ? 'text-red-600' : 'text-slate-700'}`}
+      className={`flex w-full items-center gap-2 whitespace-nowrap rounded-lg px-3 py-2 text-left hover:bg-slate-50 ${tone === 'danger' ? 'text-red-600' : 'text-slate-700'}`}
     >
+      {icon}
       {children}
     </button>
   )
