@@ -14,6 +14,7 @@ v1 implemented per [the design spec](docs/superpowers/specs/2026-10-06-dental-re
 - One test: `cd server && npx vitest run tests/unit/recallRules.test.js -t "counts call 1"` (same pattern in `client/`)
 - New migration after editing `server/prisma/schema.prisma`: `npm run db:migrate -w server -- --name <name>`
 - Production: `npm run build && npm start` (start runs `prisma migrate deploy` first)
+- Demo data for local testing: `npm run db:seed-demo -w server` (16 fake patients tagged 「【測試資料】」 in their note, dates relative to today; re-running replaces only those; refuses when `NODE_ENV=production`)
 - Forgotten password: `npm run reset-password -w server -- <new-password>` against the target database (on Railway: `railway run npm run reset-password -w server -- <new-password>`)
 
 ## Deployment (Railway)

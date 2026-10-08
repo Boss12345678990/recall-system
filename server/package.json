@@ -11,6 +11,7 @@
     "prisma:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:seed": "node src/scripts/seed.js",
+    "db:seed-demo": "node src/scripts/seed-demo.js",
     "reset-password": "node src/scripts/reset-password.js"
   },
   "dependencies": {
