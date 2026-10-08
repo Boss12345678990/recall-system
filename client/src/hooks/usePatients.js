@@ -40,7 +40,7 @@ function usePatientMutation(mutationFn, successMessage, { toastErrors = true } =
 export function useCreatePatient() {
   return usePatientMutation(
     (body) => api.post('/patients', body),
-    (data, body) => (body.registerVisitToday ? '已新增客人並登記今日看診' : '已新增客人'),
+    (data, body) => (body.registerVisitToday ? '已新增病患並登記今日看診' : '已新增病患'),
     { toastErrors: false },
   )
 }
@@ -50,7 +50,7 @@ export function useUpdatePatient() {
 }
 
 export function useDeletePatient() {
-  return usePatientMutation((id) => api.del(`/patients/${id}`), '已刪除客人')
+  return usePatientMutation((id) => api.del(`/patients/${id}`), '已刪除病患')
 }
 
 export function useRecordVisit() {

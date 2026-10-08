@@ -17,7 +17,7 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-screen items-center justify-center px-6">
       <form onSubmit={submit} className="w-full max-w-sm space-y-6 rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
-        <h1 className="text-center text-xl font-semibold text-teal-700">回診追蹤系統</h1>
+        <h1 className="text-center text-xl font-semibold text-orange-700">回診追蹤系統</h1>
         <Field label="帳號">
           <input className={inputClass} autoComplete="username" value={form.username}
             onChange={(e) => setForm({ ...form, username: e.target.value })} />

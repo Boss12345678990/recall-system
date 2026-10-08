@@ -78,7 +78,7 @@ async function findPatientIds(db, rows) {
 
 export async function buildTemplate() {
   const workbook = new ExcelJS.Workbook()
-  const sheet = workbook.addWorksheet('客人資料')
+  const sheet = workbook.addWorksheet('病患資料')
   sheet.columns = IMPORT_COLUMNS.map((c) => ({
     header: c.header, key: c.key, width: c.key === 'comment' ? 30 : 16, style: { numFmt: '@' },
   }))
@@ -140,7 +140,7 @@ export async function commitImport(rows) {
   const keys = new Set()
   for (const row of rows) {
     const key = patientKey(row)
-    if (keys.has(key)) throw new ValidationError('IMPORT_DUPLICATE_IN_FILE', `匯入資料中有重複的客人：${row.name}`)
+    if (keys.has(key)) throw new ValidationError('IMPORT_DUPLICATE_IN_FILE', `匯入資料中有重複的病患：${row.name}`)
     keys.add(key)
   }
 

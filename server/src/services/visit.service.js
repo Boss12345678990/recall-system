@@ -9,7 +9,7 @@ import { getSettings } from './setting.service.js'
 // Serialises concurrent visit changes for one patient.
 async function lockPatient(tx, patientId) {
   const rows = await tx.$queryRaw`SELECT id FROM Patient WHERE id = ${patientId} FOR UPDATE`
-  if (rows.length === 0) throw new NotFoundError('PATIENT_NOT_FOUND', '找不到這位客人')
+  if (rows.length === 0) throw new NotFoundError('PATIENT_NOT_FOUND', '找不到這位病患')
 }
 
 export async function recordVisitInTx(tx, patientId, { visitDate, note }, today) {

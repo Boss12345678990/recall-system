@@ -18,14 +18,14 @@ export default function RecallTimeline({ recall, hasLine }) {
       <ol className="space-y-3 border-l-2 border-slate-100 pl-5">
         {rows.map((row) => (
           <li key={row.label} className="relative">
-            <span className={`absolute -left-[27px] top-1.5 h-3 w-3 rounded-full ${row.done ? 'bg-teal-500' : 'border-2 border-slate-300 bg-white'}`} />
+            <span className={`absolute -left-[27px] top-1.5 h-3 w-3 rounded-full ${row.done ? 'bg-orange-500' : 'border-2 border-slate-300 bg-white'}`} />
             <span className="text-sm text-slate-500">{row.label}</span>
             <span className="ml-3">{row.value}</span>
           </li>
         ))}
       </ol>
       {recall.nextAction && (
-        <p className="mt-4 text-sm font-medium text-teal-700">
+        <p className="mt-4 text-sm font-medium text-orange-700">
           下一步：{NEXT_ACTION_LABELS[recall.nextAction.action]}（{formatDate(recall.nextAction.actionDate)}）
         </p>
       )}

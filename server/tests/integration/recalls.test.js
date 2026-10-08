@@ -141,10 +141,10 @@ describe('PATCH /api/recalls/:id', () => {
   it('moves the step forward, filling dates, and saves the note on the event', async () => {
     const recall = await patientWithRecall()
     const res = await agent.patch(`/api/recalls/${recall.id}`)
-      .send({ step: 'CALLED_1', note: '客人說下週再約', version: 0 }).expect(200)
+      .send({ step: 'CALLED_1', note: '病患說下週再約', version: 0 }).expect(200)
     expect(res.body.data.recall).toMatchObject({ step: 'CALLED_1', lineSentAt: today, call1At: today })
     const event = await prisma.recallEvent.findUnique({ where: { id: res.body.data.eventId } })
-    expect(event).toMatchObject({ type: 'MANUAL_EDIT', note: '客人說下週再約' })
+    expect(event).toMatchObject({ type: 'MANUAL_EDIT', note: '病患說下週再約' })
   })
 
   it('marks UNREACHABLE when moved to call 3', async () => {

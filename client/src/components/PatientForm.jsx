@@ -35,7 +35,7 @@ export default function PatientForm({ initial = {}, submitLabel, onSubmit, pendi
           <input className={inputClass} required inputMode="tel" value={form.phoneNumber} onChange={update('phoneNumber')} />
         </Field>
         <label className="flex items-center gap-2 self-end pb-2 text-sm text-slate-700">
-          <input type="checkbox" checked={form.hasLine} onChange={update('hasLine')} className="h-4 w-4 accent-teal-600" />
+          <input type="checkbox" checked={form.hasLine} onChange={update('hasLine')} className="h-4 w-4 accent-orange-600" />
           有加 LINE
         </label>
       </div>
@@ -44,7 +44,7 @@ export default function PatientForm({ initial = {}, submitLabel, onSubmit, pendi
       </Field>
       {registerVisitOption && (
         <label className="flex items-center gap-2 text-sm text-slate-700">
-          <input type="checkbox" checked={registerVisit} onChange={(e) => setRegisterVisit(e.target.checked)} className="h-4 w-4 accent-teal-600" />
+          <input type="checkbox" checked={registerVisit} onChange={(e) => setRegisterVisit(e.target.checked)} className="h-4 w-4 accent-orange-600" />
           同時登記今日看診
         </label>
       )}
@@ -52,7 +52,7 @@ export default function PatientForm({ initial = {}, submitLabel, onSubmit, pendi
         <p className="text-sm text-red-600">
           {error.message}
           {error.code === 'PATIENT_DUPLICATE' && (
-            <Link to={`/patients/${error.details.existingPatientId}`} className="ml-2 underline">查看這位客人</Link>
+            <Link to={`/patients/${error.details.existingPatientId}`} className="ml-2 underline">查看這位病患</Link>
           )}
         </p>
       )}

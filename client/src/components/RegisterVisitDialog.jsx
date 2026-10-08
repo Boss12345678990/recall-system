@@ -22,7 +22,7 @@ export default function RegisterVisitDialog({ onClose }) {
 
   if (creating) {
     return (
-      <Modal title="新客人" onClose={onClose}>
+      <Modal title="新病患" onClose={onClose}>
         <PatientForm
           initial={guessInitial(search)}
           submitLabel="儲存並登記看診"
@@ -62,10 +62,10 @@ export default function RegisterVisitDialog({ onClose }) {
         ))}
       </ul>
       {term && results.isSuccess && items.length === 0 && (
-        <p className="py-4 text-center text-sm text-slate-500">找不到符合的客人</p>
+        <p className="py-4 text-center text-sm text-slate-500">找不到符合的病患</p>
       )}
       <div className="mt-6 border-t border-slate-100 pt-4">
-        <Button variant="secondary" onClick={() => setCreating(true)}>＋ 新客人</Button>
+        <Button variant="secondary" onClick={() => setCreating(true)}>＋ 新病患</Button>
       </div>
     </Modal>
   )

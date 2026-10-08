@@ -1,5 +1,5 @@
 export const inputClass =
-  'w-full rounded-xl border border-slate-300 bg-white px-3 py-2 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-100'
+  'w-full rounded-xl border border-slate-300 bg-white px-3 py-2 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-100'
 
 export default function Field({ label, error, hint, children }) {
   return (

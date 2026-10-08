@@ -33,7 +33,7 @@ describe('POST /api/patients', () => {
     const first = await agent.post('/api/patients').send(NEW_PATIENT).expect(201)
     const res = await agent.post('/api/patients').send({ ...NEW_PATIENT, name: '王小明　' }).expect(409)
     expect(res.body.error).toEqual({
-      code: 'PATIENT_DUPLICATE', message: '已有相同姓名與生日的客人', details: { existingPatientId: first.body.data.id },
+      code: 'PATIENT_DUPLICATE', message: '已有相同姓名與生日的病患', details: { existingPatientId: first.body.data.id },
     })
   })
 
@@ -90,7 +90,7 @@ describe('GET /api/patients', () => {
 describe('GET/PATCH/DELETE /api/patients/:id', () => {
   it('returns 404 for a missing patient', async () => {
     const res = await agent.get('/api/patients/999999').expect(404)
-    expect(res.body.error).toEqual({ code: 'PATIENT_NOT_FOUND', message: '找不到這位客人' })
+    expect(res.body.error).toEqual({ code: 'PATIENT_NOT_FOUND', message: '找不到這位病患' })
   })
 
   it('returns detail with current recall, visits and events', async () => {

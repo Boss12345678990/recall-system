@@ -47,7 +47,7 @@ export default function RecallEditor({ recall }) {
         </Field>
       </div>
       <Field label="備註（選填）">
-        <input className={inputClass} value={form.note} onChange={update('note')} placeholder="例：客人說下個月再約" />
+        <input className={inputClass} value={form.note} onChange={update('note')} placeholder="例：病患說下個月再約" />
       </Field>
       <div className="flex justify-end">
         <Button type="submit" disabled={!dirty || edit.isPending}>儲存變更</Button>

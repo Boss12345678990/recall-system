@@ -43,10 +43,10 @@ export default function PatientDetailPage() {
     <div className="space-y-8">
       <div className="flex items-center justify-between">
         <div>
-          <Link to="/patients" className="text-sm text-slate-500 hover:text-teal-700">← 客人</Link>
+          <Link to="/patients" className="text-sm text-slate-500 hover:text-orange-700">← 病患清單</Link>
           <h1 className="mt-3 text-2xl font-semibold">{patient.name}</h1>
         </div>
-        <Button variant="ghost" onClick={() => setConfirming('patient')}>刪除客人</Button>
+        <Button variant="ghost" onClick={() => setConfirming('patient')}>刪除病患</Button>
       </div>
 
       <Section
@@ -108,7 +108,7 @@ export default function PatientDetailPage() {
 
       {confirming === 'patient' && (
         <ConfirmDialog
-          title="刪除客人"
+          title="刪除病患"
           message={`確定要刪除「${patient.name}」嗎？所有看診與回診追蹤紀錄都會一起刪除，無法復原。`}
           confirmLabel="刪除"
           pending={deletePatient.isPending}

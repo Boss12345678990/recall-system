@@ -11,7 +11,7 @@ export function renderWithProviders(ui, { route = '/', path = '/' } = {}) {
         <MemoryRouter initialEntries={[route]}>
           <Routes>
             <Route path={path} element={ui} />
-            <Route path="/patients/:id" element={<p>客人詳細頁</p>} />
+            <Route path="/patients/:id" element={<p>病患詳細頁</p>} />
           </Routes>
         </MemoryRouter>
       </ToastProvider>

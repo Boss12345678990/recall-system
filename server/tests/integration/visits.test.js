@@ -107,7 +107,7 @@ describe('DELETE /api/visits/:id', () => {
 describe('POST /api/patients with registerVisitToday', () => {
   it('creates the patient and their first recall in one step', async () => {
     const res = await agent.post('/api/patients').send({
-      name: '新客人', phoneNumber: '0912000111', birthDate: '2000-02-02', registerVisitToday: true,
+      name: '新病患', phoneNumber: '0912000111', birthDate: '2000-02-02', registerVisitToday: true,
     }).expect(201)
     expect(res.body.data.visits).toHaveLength(1)
     expect(res.body.data.currentRecall).toMatchObject({ dueDate: addMonths(today, 6), status: 'PENDING' })

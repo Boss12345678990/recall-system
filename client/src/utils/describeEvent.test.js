@@ -11,12 +11,12 @@ describe('describeEvent', () => {
 
   it('lists every changed field and the note for manual edits', () => {
     const event = {
-      type: 'MANUAL_EDIT', action: null, note: '客人說下個月再約',
+      type: 'MANUAL_EDIT', action: null, note: '病患說下個月再約',
       before, after: { ...before, status: 'CONFIRMED', dueDate: '2026-11-02' },
     }
     expect(describeEvent(event)).toEqual({
       title: '手動修改',
-      lines: ['狀態：未確認 → 確認複診', '回診日：2026/10/13 → 2026/11/02', '備註：客人說下個月再約'],
+      lines: ['狀態：未確認 → 確認複診', '回診日：2026/10/13 → 2026/11/02', '備註：病患說下個月再約'],
     })
   })
 })

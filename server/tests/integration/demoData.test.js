@@ -35,7 +35,7 @@ describe('seedDemoData', () => {
   })
 
   it('can be re-run without duplicating and leaves real patients alone', async () => {
-    await prisma.patient.create({ data: { name: '真的客人', phoneNumber: '0912345678', birthDate: new Date('1990-01-01T00:00:00Z') } })
+    await prisma.patient.create({ data: { name: '真的病患', phoneNumber: '0912345678', birthDate: new Date('1990-01-01T00:00:00Z') } })
     await seedDemoData()
     const first = await prisma.patient.count()
     await seedDemoData()

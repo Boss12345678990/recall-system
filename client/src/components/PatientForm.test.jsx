@@ -24,9 +24,9 @@ describe('PatientForm', () => {
   })
 
   it('links to the existing patient on a duplicate', () => {
-    const error = { code: 'PATIENT_DUPLICATE', message: '已有相同姓名與生日的客人', details: { existingPatientId: 7 } }
+    const error = { code: 'PATIENT_DUPLICATE', message: '已有相同姓名與生日的病患', details: { existingPatientId: 7 } }
     renderWithProviders(<PatientForm submitLabel="儲存" onSubmit={() => {}} error={error} />)
-    expect(screen.getByText('已有相同姓名與生日的客人')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: '查看這位客人' })).toHaveAttribute('href', '/patients/7')
+    expect(screen.getByText('已有相同姓名與生日的病患')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: '查看這位病患' })).toHaveAttribute('href', '/patients/7')
   })
 })

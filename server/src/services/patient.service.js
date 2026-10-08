@@ -55,7 +55,7 @@ export async function getPatient(id) {
     where: { id },
     include: { recalls: CURRENT_RECALL, visits: { orderBy: { visitDate: 'desc' } } },
   })
-  if (!row) throw new NotFoundError('PATIENT_NOT_FOUND', '找不到這位客人')
+  if (!row) throw new NotFoundError('PATIENT_NOT_FOUND', '找不到這位病患')
   const [events, settings] = await Promise.all([
     prisma.recallEvent.findMany({ where: { recall: { patientId: id } }, orderBy: { id: 'desc' }, take: 100 }),
     getSettings(),
@@ -72,7 +72,7 @@ async function assertNoDuplicate(db, name, birthDate, excludeId) {
     where: { name_birthDate: { name, birthDate: toDbDate(birthDate) } },
   })
   if (existing && existing.id !== excludeId) {
-    throw new ConflictError('PATIENT_DUPLICATE', '已有相同姓名與生日的客人', { existingPatientId: existing.id })
+    throw new ConflictError('PATIENT_DUPLICATE', '已有相同姓名與生日的病患', { existingPatientId: existing.id })
   }
 }
 
@@ -90,7 +90,7 @@ export async function createPatient({ registerVisitToday, ...input }) {
 export async function updatePatient(id, changes) {
   await prisma.$transaction(async (tx) => {
     const current = await tx.patient.findUnique({ where: { id } })
-    if (!current) throw new NotFoundError('PATIENT_NOT_FOUND', '找不到這位客人')
+    if (!current) throw new NotFoundError('PATIENT_NOT_FOUND', '找不到這位病患')
     if (changes.name !== undefined || changes.birthDate !== undefined) {
       const name = changes.name ?? current.name
       const birthDate = changes.birthDate ?? current.birthDate.toISOString().slice(0, 10)
@@ -103,6 +103,6 @@ export async function updatePatient(id, changes) {
 
 export async function deletePatient(id) {
   const existing = await prisma.patient.findUnique({ where: { id }, select: { id: true } })
-  if (!existing) throw new NotFoundError('PATIENT_NOT_FOUND', '找不到這位客人')
+  if (!existing) throw new NotFoundError('PATIENT_NOT_FOUND', '找不到這位病患')
   await prisma.patient.delete({ where: { id } })
 }

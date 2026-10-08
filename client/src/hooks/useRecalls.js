@@ -54,6 +54,13 @@ export function useEditRecall() {
 export function useRestartRecall() {
   return useRecallMutation(
     ({ id, dueDate, version }) => api.post(`/recalls/${id}/restart`, { dueDate, version }),
-    '已重新開始追蹤',
+    '已改約，提醒會從傳 LINE 重新開始',
+  )
+}
+
+export function useMarkUnreachable() {
+  return useRecallMutation(
+    ({ id, version }) => api.patch(`/recalls/${id}`, { status: 'UNREACHABLE', version }),
+    '已標記為聯絡不上',
   )
 }

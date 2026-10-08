@@ -7,7 +7,7 @@ let sequence = 0
 export async function createPatient({ birthDate = '1990-01-01', ...overrides } = {}) {
   sequence += 1
   return prisma.patient.create({
-    data: { name: `測試客人${sequence}`, phoneNumber: '0912345678', hasLine: true, ...overrides, birthDate: toDbDate(birthDate) },
+    data: { name: `測試病患${sequence}`, phoneNumber: '0912345678', hasLine: true, ...overrides, birthDate: toDbDate(birthDate) },
   })
 }
 
