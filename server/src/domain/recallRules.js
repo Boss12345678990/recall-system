@@ -110,10 +110,9 @@ export function applyManualEdit(recall, changes, today) {
   return { patch: next }
 }
 
-export function canRestart(recall, today) {
-  return recall.onHold
-    || recall.status === 'UNREACHABLE'
-    || (recall.status === 'CONFIRMED' && recall.dueDate < today)
+// Restart doubles as 改約 (reschedule): any open recall can start over toward a new due date.
+export function canRestart(recall) {
+  return recall.status !== 'COMPLETED'
 }
 
 export function restartFields(dueDate) {

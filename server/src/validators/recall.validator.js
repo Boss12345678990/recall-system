@@ -4,7 +4,7 @@ import { STEPS } from '../domain/recallRules.js'
 
 const version = z.number().int().min(0)
 
-export const RECALL_LISTS = ['confirmed-no-show', 'import-overdue', 'unreachable']
+export const RECALL_LISTS = ['waiting', 'confirmed', 'unreachable', 'import-overdue']
 
 export const listSchema = requestSchema({ query: z.object({ list: z.enum(RECALL_LISTS) }) })
 

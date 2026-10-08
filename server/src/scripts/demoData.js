@@ -21,6 +21,8 @@ const SCENARIOS = [
     name: '吳雅婷', birthDate: '1995-04-17', note: '第 3 次電話已逾期 2 天', dueIn: -2,
     actions: [['LINE_SENT', -9], ['CALL_NO_ANSWER', -6], ['CALL_NO_ANSWER', -4]],
   },
+  { name: '周家瑜', birthDate: '1993-02-14', note: '昨天傳了 LINE，等回覆', dueIn: 6, actions: [['LINE_SENT', -1]] },
+  { name: '何宗翰', birthDate: '1972-11-30', note: '打了 1 次沒接，後天再打', dueIn: 5, actions: [['LINE_SENT', -4], ['CALL_NO_ANSWER', 0]] },
   { name: '劉俊傑', birthDate: '1979-12-05', note: '一個月後回診', dueIn: 30, actions: [] },
   { name: '蔡宜君', birthDate: '2001-07-11', note: '三個月後回診', dueIn: 90, actions: [] },
   { name: '楊志偉', birthDate: '1970-02-28', note: '已確認複診', dueIn: 3, actions: [['LINE_SENT', -4], ['CONFIRM', -1]] },

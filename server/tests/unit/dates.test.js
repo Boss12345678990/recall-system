@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  todayInClinic, addDays, addMonths, diffDays, toDbDate, fromDbDate, isValidDateString,
+  todayInClinic, startOfClinicDay, addDays, addMonths, diffDays, toDbDate, fromDbDate, isValidDateString,
 } from '../../src/lib/dates.js'
 
 describe('todayInClinic', () => {
@@ -38,4 +38,10 @@ describe('isValidDateString', () => {
   it.each(['2026-02-30', '2026-13-01', '2026/10/06', '20261006', '', null, 20261006])(
     'rejects %s', (s) => expect(isValidDateString(s)).toBe(false),
   )
+})
+
+describe('startOfClinicDay', () => {
+  it('is Taipei midnight, i.e. 16:00 UTC the day before', () => {
+    expect(startOfClinicDay('2026-10-06').toISOString()).toBe('2026-10-05T16:00:00.000Z')
+  })
 })

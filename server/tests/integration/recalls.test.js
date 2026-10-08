@@ -35,7 +35,18 @@ describe('GET /api/recalls/today', () => {
     expect(data.items.map((i) => i.patient.name)).toEqual(['丙', '乙', '甲'])
     expect(data.summary).toEqual({ total: 3, overdue: 1 })
     expect(data.items[0].nextAction).toEqual({ action: 'CALL_1', actionDate: addDays(today, -2), overdueDays: 2 })
-    expect(data.counts).toEqual({ 'confirmed-no-show': 0, 'import-overdue': 1, unreachable: 0 })
+    expect(data.counts).toEqual({ waiting: 0, confirmed: 1, unreachable: 0, 'import-overdue': 1 })
+    expect(data.progress).toEqual({ done: 0, total: 3 })
+  })
+
+  it('counts recalls handled today in progress after they leave the to-do list', async () => {
+    const recall = await patientWithRecall({ dueDate: addDays(today, 7) })
+    await patientWithRecall({ dueDate: addDays(today, 7) })
+    await agent.post(`/api/recalls/${recall.id}/actions`).send({ action: 'LINE_SENT', version: 0 }).expect(200)
+    const { data } = (await agent.get('/api/recalls/today').expect(200)).body
+    expect(data.items).toHaveLength(1)
+    expect(data.progress).toEqual({ done: 1, total: 2 })
+    expect(data.counts.waiting).toBe(1)
   })
 
   it('asks for a call instead of LINE for patients without LINE', async () => {
@@ -46,15 +57,18 @@ describe('GET /api/recalls/today', () => {
 })
 
 describe('GET /api/recalls?list=', () => {
-  it('returns each secondary list', async () => {
-    await patientWithRecall({ dueDate: addDays(today, -1), status: 'CONFIRMED' }, { name: '確認未到' })
+  it('returns each tab list', async () => {
     await patientWithRecall({ dueDate: addDays(today, 1), status: 'CONFIRMED' }, { name: '確認未過期' })
+    await patientWithRecall({ dueDate: addDays(today, -1), status: 'CONFIRMED' }, { name: '確認未到' })
+    await patientWithRecall({ dueDate: addDays(today, 6), step: 'LINE_SENT', lineSentAt: addDays(today, -1) }, { name: '等回覆' })
+    await patientWithRecall({ dueDate: addDays(today, 30) }, { name: '還沒聯絡' })
     await patientWithRecall({ dueDate: addDays(today, -40), onHold: true }, { name: '過期匯入' })
     await patientWithRecall({ step: 'CALLED_3', status: 'UNREACHABLE' }, { name: '聯絡不上' })
 
     const names = async (list) =>
       (await agent.get(`/api/recalls?list=${list}`).expect(200)).body.data.items.map((i) => i.patient.name)
-    expect(await names('confirmed-no-show')).toEqual(['確認未到'])
+    expect(await names('confirmed')).toEqual(['確認未到', '確認未過期'])
+    expect(await names('waiting')).toEqual(['等回覆'])
     expect(await names('import-overdue')).toEqual(['過期匯入'])
     expect(await names('unreachable')).toEqual(['聯絡不上'])
   })
@@ -181,8 +195,17 @@ describe('POST /api/recalls/:id/restart', () => {
     expect(data.items.map((i) => i.id)).toEqual([recall.id])
   })
 
-  it('refuses a recall that is still in progress', async () => {
-    const recall = await patientWithRecall()
+  it('reschedules (改約) a recall that is still in progress and notes the new date', async () => {
+    const recall = await patientWithRecall({ step: 'LINE_SENT', lineSentAt: addDays(today, -1) })
+    const dueDate = addDays(today, 14)
+    const res = await agent.post(`/api/recalls/${recall.id}/restart`).send({ dueDate, version: 0 }).expect(200)
+    expect(res.body.data.recall).toMatchObject({ step: 'NOT_CONTACTED', lineSentAt: null, dueDate })
+    const event = await prisma.recallEvent.findUnique({ where: { id: res.body.data.eventId } })
+    expect(event.note).toBe(`改約至 ${dueDate.replaceAll('-', '/')}`)
+  })
+
+  it('refuses a completed recall', async () => {
+    const recall = await patientWithRecall({ status: 'COMPLETED' })
     const res = await agent.post(`/api/recalls/${recall.id}/restart`).send({ dueDate: addDays(today, 7), version: 0 }).expect(409)
     expect(res.body.error.code).toBe('RESTART_NOT_ALLOWED')
   })

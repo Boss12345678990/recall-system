@@ -188,9 +188,9 @@ describe('restart', () => {
     ['on hold', { onHold: true }, true],
     ['unreachable', { status: 'UNREACHABLE', step: 'CALLED_3' }, true],
     ['confirmed but past due', { status: 'CONFIRMED', dueDate: '2026-10-05' }, true],
-    ['confirmed and due today', { status: 'CONFIRMED', dueDate: '2026-10-06' }, false],
-    ['pending', {}, false],
-    ['completed', { status: 'COMPLETED' }, false],
+    ['confirmed and due today (改約)', { status: 'CONFIRMED', dueDate: '2026-10-06' }, true],
+    ['pending (改約)', {}, true],
+    ['completed, even if on hold', { status: 'COMPLETED', onHold: true }, false],
   ])('canRestart when %s', (label, overrides, expected) => {
     expect(canRestart(recall(overrides), TODAY)).toBe(expected)
   })

@@ -1,5 +1,5 @@
 import { prisma } from '../lib/prisma.js'
-import { todayInClinic, toDbDate } from '../lib/dates.js'
+import { startOfClinicDay, todayInClinic } from '../lib/dates.js'
 import { ConflictError, NotFoundError, ValidationError } from '../errors/AppError.js'
 import { recallFromDb, recallFieldsToDb } from '../mappers/recall.mapper.js'
 import {
@@ -7,58 +7,74 @@ import {
 } from '../domain/recallRules.js'
 import { getSettings } from './setting.service.js'
 
+// Tab lists. Confirmed recalls whose due date has passed sort first (due date ascending).
 const LIST_QUERIES = {
-  'confirmed-no-show': (today) => ({
-    where: { status: 'CONFIRMED', dueDate: { lt: toDbDate(today) } },
-    orderBy: [{ dueDate: 'asc' }, { id: 'asc' }],
-  }),
-  'import-overdue': () => ({
-    where: { onHold: true, status: 'PENDING' },
-    orderBy: [{ dueDate: 'asc' }, { id: 'asc' }],
-  }),
-  unreachable: () => ({
-    where: { status: 'UNREACHABLE' },
-    orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
-  }),
+  waiting: { where: { status: 'PENDING', onHold: false, step: { not: 'NOT_CONTACTED' } }, orderBy: [{ dueDate: 'asc' }, { id: 'asc' }] },
+  confirmed: { where: { status: 'CONFIRMED' }, orderBy: [{ dueDate: 'asc' }, { id: 'asc' }] },
+  unreachable: { where: { status: 'UNREACHABLE' }, orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }] },
+  'import-overdue': { where: { onHold: true, status: 'PENDING' }, orderBy: [{ dueDate: 'asc' }, { id: 'asc' }] },
+}
+
+// "Waiting for a reply" also needs the next step to be not yet due, which only the recall rules know.
+const LIST_FILTERS = {
+  waiting: (item, today) => item.nextAction !== null && item.nextAction.actionDate > today,
 }
 
 function toRecallWithPatient(row) {
-  const { id, name, phoneNumber, hasLine } = row.patient
-  return { ...recallFromDb(row), patient: { id, name, phoneNumber, hasLine } }
+  const { id, name, phoneNumber, hasLine, comment } = row.patient
+  return { ...recallFromDb(row), patient: { id, name, phoneNumber, hasLine, comment } }
 }
 
 function staleError() {
   return new ConflictError('RECALL_STALE', '這筆資料剛被其他人更新，已重新整理')
 }
 
-async function countLists(today) {
-  const entries = await Promise.all(
-    Object.entries(LIST_QUERIES).map(async ([list, query]) => [list, await prisma.recall.count({ where: query(today).where })]),
-  )
-  return Object.fromEntries(entries)
+async function loadList(list, settings, today) {
+  const rows = await prisma.recall.findMany({ ...LIST_QUERIES[list], include: { patient: true } })
+  const items = rows.map((row) => withNextAction(toRecallWithPatient(row), row.patient.hasLine, settings, today))
+  const keep = LIST_FILTERS[list]
+  return keep ? items.filter((item) => keep(item, today)) : items
+}
+
+async function countLists(settings, today) {
+  const lists = Object.keys(LIST_QUERIES)
+  const lengths = await Promise.all(lists.map(async (list) => (await loadList(list, settings, today)).length))
+  return Object.fromEntries(lists.map((list, index) => [list, lengths[index]]))
+}
+
+// Recalls with a contact recorded today that are no longer waiting in the to-do list.
+async function countHandledToday(today, remainingIds) {
+  const handled = await prisma.recallEvent.findMany({
+    where: { type: 'ACTION', createdAt: { gte: startOfClinicDay(today) } },
+    distinct: ['recallId'],
+    select: { recallId: true },
+  })
+  return handled.filter(({ recallId }) => !remainingIds.has(recallId)).length
 }
 
 export async function getToday() {
   const today = todayInClinic()
-  const [rows, settings, counts] = await Promise.all([
+  const settings = await getSettings()
+  const [rows, counts] = await Promise.all([
     prisma.recall.findMany({ where: { status: 'PENDING', onHold: false }, include: { patient: true } }),
-    getSettings(),
-    countLists(today),
+    countLists(settings, today),
   ])
   const items = buildTodayItems(rows.map(toRecallWithPatient), settings, today)
   const overdue = items.filter((item) => item.nextAction.overdueDays > 0).length
-  return { today, summary: { total: items.length, overdue }, counts, items }
+  const done = await countHandledToday(today, new Set(items.map((item) => item.id)))
+  return {
+    today,
+    summary: { total: items.length, overdue },
+    progress: { done, total: done + items.length },
+    counts,
+    items,
+  }
 }
 
 export async function getList(list) {
   const today = todayInClinic()
-  const [rows, settings] = await Promise.all([
-    prisma.recall.findMany({ ...LIST_QUERIES[list](today), include: { patient: true } }),
-    getSettings(),
-  ])
-  return {
-    items: rows.map((row) => withNextAction(toRecallWithPatient(row), row.patient.hasLine, settings, today)),
-  }
+  const settings = await getSettings()
+  return { items: await loadList(list, settings, today) }
 }
 
 async function loadForUpdate(tx, id, version) {
@@ -134,7 +150,8 @@ export async function restartRecall(id, { dueDate, version }) {
     if (!canRestart(recallFromDb(row), today)) {
       throw new ConflictError('RESTART_NOT_ALLOWED', '這筆追蹤目前不需要重新追蹤')
     }
-    const eventId = await writeChange(tx, row, restartFields(dueDate), { type: 'RESTART' })
+    const note = `改約至 ${dueDate.replaceAll('-', '/')}`
+    const eventId = await writeChange(tx, row, restartFields(dueDate), { type: 'RESTART', note })
     return result(tx, id, eventId, today)
   })
 }

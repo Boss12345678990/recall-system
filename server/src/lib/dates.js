@@ -13,6 +13,11 @@ export function todayInClinic(now = new Date()) {
   return dayjs(now).tz(CLINIC_TIMEZONE).format(FORMAT)
 }
 
+// The instant the clinic's day starts (Taipei midnight), for comparing against timestamps.
+export function startOfClinicDay(date) {
+  return dayjs.tz(date, CLINIC_TIMEZONE).toDate()
+}
+
 export function addDays(date, days) {
   return dayjs.utc(date).add(days, 'day').format(FORMAT)
 }

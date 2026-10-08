@@ -24,7 +24,7 @@ describe('seedDemoData', () => {
       ['林志明', 'SEND_LINE', 0],
     ])
     expect(data.summary).toEqual({ total: 7, overdue: 3 })
-    expect(data.counts).toEqual({ 'confirmed-no-show': 1, 'import-overdue': 2, unreachable: 1 })
+    expect(data.counts).toEqual({ waiting: 2, confirmed: 2, unreachable: 1, 'import-overdue': 2 })
   })
 
   it('records a history event for every contact so the detail page has something to show', async () => {
