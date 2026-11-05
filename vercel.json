@@ -1,0 +1,11 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "buildCommand": "npm run build && if [ \"$VERCEL_ENV\" = \"production\" ]; then npm run db:deploy -w server; fi",
+  "outputDirectory": "client/dist",
+  "regions": ["hnd1"],
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}

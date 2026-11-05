@@ -18,8 +18,9 @@ export function createApp({ clientDist = DEFAULT_CLIENT_DIST } = {}) {
   app.use('/api', apiRouter())
   app.use('/api', (req, res, next) => next(new NotFoundError('ROUTE_NOT_FOUND', '找不到此 API')))
 
-  const indexHtml = path.join(clientDist, 'index.html')
-  if (fs.existsSync(indexHtml)) {
+  // clientDist: null means the static client is served by the host (Vercel), not Express.
+  const indexHtml = clientDist && path.join(clientDist, 'index.html')
+  if (indexHtml && fs.existsSync(indexHtml)) {
     app.use(express.static(clientDist, { index: false, maxAge: '7d' }))
     app.get('/{*splat}', (req, res) => {
       res.set('Cache-Control', 'no-cache')
