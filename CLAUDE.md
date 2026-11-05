@@ -24,7 +24,7 @@ Live at https://recall-system-rose.vercel.app. Vercel project `recall-system` (H
 - `api/index.js` exports `createApp({ clientDist: null })` as one serverless function in `hnd1`; `vercel.json` rewrites `/api/*` to it and everything else to `index.html`. Vercel serves `client/dist` statically. `server/src/server.js` is only for local/self-hosted runs.
 - Production builds run `prisma migrate deploy` (guarded by `VERCEL_ENV=production`), so new migrations ship by merging to `main`.
 - Vercel env (Production only): `DATABASE_URL` (TiDB URL ending `/recall?sslaccept=strict`) and `JWT_SECRET`. Do not set `NODE_ENV` there: it makes the build skip devDependencies (Vite). Vercel functions already run with `NODE_ENV=production`.
-- Running scripts against production: `vercel env pull server/.env.production --environment=production`, then `cd server && node --env-file=.env.production src/scripts/<script>.js` (admin: `ADMIN_USERNAME`/`ADMIN_PASSWORD` env + `seed.js`). That file does not set `NODE_ENV`, so never run `seed-demo.js` with it.
+- Running scripts against production: `server/.env.production` (gitignored, local only) holds the TiDB `DATABASE_URL` plus a placeholder `JWT_SECRET`. `vercel env pull` can't recreate it, because the Vercel vars are sensitive and only pull as placeholders; get the URL from TiDB Cloud → Connect. Then `cd server && node --env-file=.env.production src/scripts/<script>.js` (admin: `ADMIN_USERNAME`/`ADMIN_PASSWORD` env + `seed.js`). That file does not set `NODE_ENV`, so never run `seed-demo.js` with it.
 - Prisma `binaryTargets` includes `rhel-openssl-3.0.x` for the Vercel runtime. The Excel upload must stay under Vercel's 4.5 MB request limit.
 
 Name ordering uses `zh-Hant-TW` collation, which sorts by stroke count (乙 before 甲).
