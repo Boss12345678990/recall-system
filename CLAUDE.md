@@ -4,7 +4,24 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project status
 
-Pre-implementation. The only source of requirements so far is [SPEC.md](SPEC.md) plus the design decisions below, which were agreed with the user after SPEC.md was written and **override it where they conflict**. No code, build, lint or test commands exist yet — add them here once `server/` and `client/` are scaffolded.
+v1 implemented per [the design spec](docs/superpowers/specs/2026-10-06-dental-recall-system-design.md) and [plan](docs/superpowers/plans/2026-10-06-dental-recall-system.md). The decisions below override [SPEC.md](SPEC.md) where they conflict.
+
+## Commands (run from the repo root)
+
+- First-time setup: `npm install`; copy `server/.env.example` → `server/.env` and `server/.env.test.example` → `server/.env.test` (test DB name must contain `test`); `npm run db:migrate -w server`; `npm run db:seed -w server`
+- Dev: `npm run dev:server` (API on :3000) and `npm run dev:client` (Vite on :5173, proxies `/api`)
+- All tests: `npm test` · server unit only: `npm run test:unit -w server` · server integration: `npm run test:integration -w server` (runs `prisma migrate deploy` on the test DB, then each test empties the tables) · client: `npm test -w client`
+- One test: `cd server && npx vitest run tests/unit/recallRules.test.js -t "counts call 1"` (same pattern in `client/`)
+- New migration after editing `server/prisma/schema.prisma`: `npm run db:migrate -w server -- --name <name>`
+- Production: `npm run build && npm start` (start runs `prisma migrate deploy` first)
+- Demo data for local testing: `npm run db:seed-demo -w server` (16 fake patients tagged 「【測試資料】」 in their note, dates relative to today; re-running replaces only those; refuses when `NODE_ENV=production`)
+- Forgotten password: `npm run reset-password -w server -- <new-password>` against the target database (on Railway: `railway run npm run reset-password -w server -- <new-password>`)
+
+## Deployment (Railway)
+
+One service from the repo root: build `npm run build`, start `npm start`, health check `/api/health`, restart on failure. Add a Railway MySQL and set `DATABASE_URL` (the MySQL service's URL), `JWT_SECRET` (32+ random chars) and `NODE_ENV=production`; run `railway run npm run db:seed -w server` once with `ADMIN_USERNAME`/`ADMIN_PASSWORD` set.
+
+Name ordering uses `zh-Hant-TW` collation, which sorts by stroke count (乙 before 甲).
 
 ## What this is
 
@@ -26,11 +43,12 @@ An internal recall (回診追蹤) system for a small dental clinic, used by 2–
   - Offsets are computed from the **actual** date the previous step was recorded, not the planned date.
 - **Recall statuses** (exactly four): `未確認` (default, in progress) · `確認複診` · `聯絡不上` (also used manually when a patient declines) · `已回診` (patient came back; a new recall cycle starts).
 - Staff can manually change both step and status; every change is recorded in a history/event table.
-- **Today's to-do list is computed on read** from step + dates — no cron jobs or background workers. Urgency order: overdue first, then call 3 > call 2 > call 1 > LINE; ties broken by nearest due date.
-- Recalls with status `確認複診` whose due date has passed with no new visit appear in a separate "確認但未到" list.
+- **Today's to-do list is computed on read** from step + dates — no cron jobs or background workers. Urgency order = the 倒數 (countdown): earliest due date first (overdue ones on top); ties go to the later contact step (call 3 > call 2 > call 1 > LINE), then name.
+- The dashboard has five tabs: 待辦 (today's to-do), 等待回覆 (contacted, next step not yet due), 已確認 (all `確認複診`; past-due ones — 確認但未到 — sort first with a red 逾期 badge), 無法聯絡, 待重新追蹤 (imports held because they were past due).
+- **改約 (reschedule)** reuses the restart endpoint: any recall except `已回診` can get a new due date, and its reminders start over from 傳 LINE. The event note records 「改約至 YYYY/MM/DD」.
 - **Notifications are in-app only** (dashboard summary + red highlighting), no desktop/push notifications.
 - **LINE is manual for v1.** Staff send from the clinic's LINE and click "已傳 LINE". Keep LINE code isolated in its own module so a later LINE Messaging API integration doesn't touch the core.
-- **Excel import** of existing paper records (姓名, 生日, 電話, 上次看診日, 備註): preview-then-commit, duplicates detected by name + birth date, and recalls already past due on import go to a "匯入時已過期" list instead of flooding today's to-do.
+- **Excel import** of existing paper records (姓名, 生日, 電話, 上次看診日, 備註): preview-then-commit, duplicates detected by name + birth date, and recalls already past due on import go to the 待重新追蹤 tab instead of flooding today's to-do.
 - **Deployment:** a single service — Express serves the built React app and the API — plus a managed MySQL on the same platform (e.g. Railway). Not the Vercel + Render split in SPEC.md.
 - **"Today"** is always calculated in `Asia/Taipei`. Visit and recall dates are date-only values.
 
@@ -51,4 +69,4 @@ Requests flow **route → controller → service → Prisma**. Never skip a laye
 
 ### Frontend layout principle
 
-The user explicitly wants an uncluttered UI: show only what the staff member needs to act on now, and push details one level down (hover, expand, or the detail page). Example: a to-do card shows the patient, a 4-dot progress bar (LINE → call 1 → call 2 → call 3), the next action, one badge (overdue days or due date) and the action buttons — step dates appear on hover over the progress dots or on the patient detail page's vertical timeline, not inline on the card. Prefer spaced cards over dense tables.
+Follows the table mockup the user supplied (2026-10-08), which replaced the earlier spaced-card design. Header: clinic name 「微笑牙醫診所」, tabs 今日待辦 (with count) and 病患清單, ⚙️ menu (設定 / 登出) at top right — no calendar or statistics pages. The dashboard shows the date, three stat cards (待傳 LINE / 待撥電話 / 逾期未確認), a 今日進度 bar, the tab bar and a table: 病患 (name, phone, note) · 回診日 · 倒數 badge · 提醒進度 (compact dots + stage + 「N 天前・未接」) · 動作 (contact button, ✓ 確認, 改約 ▾, ··· menu). 「＋新增病患」 and 「匯入 Excel」 live on 病患清單. Orange is the accent colour, green the confirm button. UI wording says 病患, not 客人.

@@ -1,0 +1,113 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           Int      @id @default(autoincrement())
+  username     String   @unique @db.VarChar(50)
+  passwordHash String   @db.VarChar(100)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Patient {
+  id          Int      @id @default(autoincrement())
+  name        String   @db.VarChar(50)
+  phoneNumber String   @db.VarChar(10)
+  birthDate   DateTime @db.Date
+  hasLine     Boolean  @default(true)
+  comment     String?  @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  visits      Visit[]
+  recalls     Recall[]
+
+  @@unique([name, birthDate])
+}
+
+model Visit {
+  id        Int      @id @default(autoincrement())
+  patientId Int
+  patient   Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  visitDate DateTime @db.Date
+  note      String?  @db.VarChar(500)
+  createdAt DateTime @default(now())
+  recall    Recall?
+
+  @@unique([patientId, visitDate])
+}
+
+enum RecallStep {
+  NOT_CONTACTED
+  LINE_SENT
+  CALLED_1
+  CALLED_2
+  CALLED_3
+}
+
+enum RecallStatus {
+  PENDING
+  CONFIRMED
+  UNREACHABLE
+  COMPLETED
+}
+
+model Recall {
+  id          Int           @id @default(autoincrement())
+  patientId   Int
+  patient     Patient       @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  visitId     Int           @unique
+  visit       Visit         @relation(fields: [visitId], references: [id], onDelete: Cascade)
+  dueDate     DateTime      @db.Date
+  step        RecallStep    @default(NOT_CONTACTED)
+  status      RecallStatus  @default(PENDING)
+  lineSentAt  DateTime?     @db.Date
+  call1At     DateTime?     @db.Date
+  call2At     DateTime?     @db.Date
+  call3At     DateTime?     @db.Date
+  confirmedAt DateTime?     @db.Date
+  onHold      Boolean       @default(false)
+  version     Int           @default(0)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  events      RecallEvent[]
+
+  @@index([status, onHold])
+  @@index([patientId])
+}
+
+enum RecallEventType {
+  ACTION
+  MANUAL_EDIT
+  UNDO
+  VISIT_RECORDED
+  RESTART
+}
+
+model RecallEvent {
+  id        Int             @id @default(autoincrement())
+  recallId  Int
+  recall    Recall          @relation(fields: [recallId], references: [id], onDelete: Cascade)
+  type      RecallEventType
+  action    String?         @db.VarChar(20)
+  note      String?         @db.VarChar(500)
+  before    Json
+  after     Json
+  createdAt DateTime        @default(now())
+
+  @@index([recallId, id])
+}
+
+model ClinicSetting {
+  id                   Int      @id @default(1)
+  recallIntervalMonths Int      @default(6)
+  lineLeadDays         Int      @default(7)
+  callAfterLineDays    Int      @default(3)
+  callGapDays          Int      @default(2)
+  updatedAt            DateTime @updatedAt
+}
