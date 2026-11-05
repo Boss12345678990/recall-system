@@ -13,13 +13,19 @@ v1 implemented per [the design spec](docs/superpowers/specs/2026-10-06-dental-re
 - All tests: `npm test` · server unit only: `npm run test:unit -w server` · server integration: `npm run test:integration -w server` (runs `prisma migrate deploy` on the test DB, then each test empties the tables) · client: `npm test -w client`
 - One test: `cd server && npx vitest run tests/unit/recallRules.test.js -t "counts call 1"` (same pattern in `client/`)
 - New migration after editing `server/prisma/schema.prisma`: `npm run db:migrate -w server -- --name <name>`
-- Production: `npm run build && npm start` (start runs `prisma migrate deploy` first)
+- Self-hosted production (not used on Vercel): `npm run build && npm start` (start runs `prisma migrate deploy` first)
 - Demo data for local testing: `npm run db:seed-demo -w server` (16 fake patients tagged 「【測試資料】」 in their note, dates relative to today; re-running replaces only those; refuses when `NODE_ENV=production`)
-- Forgotten password: `npm run reset-password -w server -- <new-password>` against the target database (on Railway: `railway run npm run reset-password -w server -- <new-password>`)
+- Forgotten password: `npm run reset-password -w server -- <new-password>` against the target database (production: `cd server && node --env-file=.env.production src/scripts/reset-password.js <new-password>`, see Deployment)
 
-## Deployment (Railway)
+## Deployment (Vercel + TiDB Cloud)
 
-One service from the repo root: build `npm run build`, start `npm start`, health check `/api/health`, restart on failure. Add a Railway MySQL and set `DATABASE_URL` (the MySQL service's URL), `JWT_SECRET` (32+ random chars) and `NODE_ENV=production`; run `railway run npm run db:seed -w server` once with `ADMIN_USERNAME`/`ADMIN_PASSWORD` set.
+Live at https://recall-system-rose.vercel.app. Vercel project `recall-system` (Hobby plan, git-connected: every push to `main` deploys to production, other branches get preview deployments). Database is TiDB Cloud Starter (free, MySQL-compatible), instance `recall-system` in AWS Tokyo; database `recall`.
+
+- `api/index.js` exports `createApp({ clientDist: null })` as one serverless function in `hnd1`; `vercel.json` rewrites `/api/*` to it and everything else to `index.html`. Vercel serves `client/dist` statically. `server/src/server.js` is only for local/self-hosted runs.
+- Production builds run `prisma migrate deploy` (guarded by `VERCEL_ENV=production`), so new migrations ship by merging to `main`.
+- Vercel env (Production only): `DATABASE_URL` (TiDB URL ending `/recall?sslaccept=strict`) and `JWT_SECRET`. Do not set `NODE_ENV` there: it makes the build skip devDependencies (Vite). Vercel functions already run with `NODE_ENV=production`.
+- Running scripts against production: `vercel env pull server/.env.production --environment=production`, then `cd server && node --env-file=.env.production src/scripts/<script>.js` (admin: `ADMIN_USERNAME`/`ADMIN_PASSWORD` env + `seed.js`). That file does not set `NODE_ENV`, so never run `seed-demo.js` with it.
+- Prisma `binaryTargets` includes `rhel-openssl-3.0.x` for the Vercel runtime. The Excel upload must stay under Vercel's 4.5 MB request limit.
 
 Name ordering uses `zh-Hant-TW` collation, which sorts by stroke count (乙 before 甲).
 
@@ -49,7 +55,7 @@ An internal recall (回診追蹤) system for a small dental clinic, used by 2–
 - **Notifications are in-app only** (dashboard summary + red highlighting), no desktop/push notifications.
 - **LINE is manual for v1.** Staff send from the clinic's LINE and click "已傳 LINE". Keep LINE code isolated in its own module so a later LINE Messaging API integration doesn't touch the core.
 - **Excel import** of existing paper records (姓名, 生日, 電話, 上次看診日, 備註): preview-then-commit, duplicates detected by name + birth date, and recalls already past due on import go to the 待重新追蹤 tab instead of flooding today's to-do.
-- **Deployment:** a single service — Express serves the built React app and the API — plus a managed MySQL on the same platform (e.g. Railway). Not the Vercel + Render split in SPEC.md.
+- **Deployment:** one Vercel project serves both the built React app (static) and the Express API (one serverless function), with TiDB Cloud Starter as the MySQL database (chosen 2026-11-05 to avoid hosting fees; Vercel Hobby is officially non-commercial, so move to Vercel Pro or Railway if that becomes a problem). Express can still serve the client itself via `npm start` for self-hosting. Not the Vercel + Render split in SPEC.md.
 - **"Today"** is always calculated in `Asia/Taipei`. Visit and recall dates are date-only values.
 
 ## Architecture
