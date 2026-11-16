@@ -3,7 +3,7 @@ import DropdownMenu, { MenuItem } from './DropdownMenu.jsx'
 import { useLogout } from '../hooks/useAuth.js'
 import { useToday } from '../hooks/useRecalls.js'
 
-export const CLINIC_NAME = '微笑牙醫診所'
+export const CLINIC_NAME = '佛牙昌醫診所'
 
 function Icon({ children }) {
   return (
