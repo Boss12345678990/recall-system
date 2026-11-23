@@ -1,18 +1,27 @@
 import { useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import Button from '../components/Button.jsx'
 import ConfirmDialog from '../components/ConfirmDialog.jsx'
 import PageMessage from '../components/PageMessage.jsx'
 import PatientForm from '../components/PatientForm.jsx'
 import RecallEditor from '../components/RecallEditor.jsx'
 import RecallTimeline from '../components/RecallTimeline.jsx'
+import TabBar from '../components/TabBar.jsx'
 import { useDeletePatient, useDeleteVisit, usePatient, useRecordVisit, useUpdatePatient } from '../hooks/usePatients.js'
 import { describeEvent } from '../utils/describeEvent.js'
 import { formatDate, formatDateTime } from '../utils/format.js'
 
-function Section({ title, action, children }) {
+const TABS = [
+  { key: 'recall', label: '回診追蹤' },
+  { key: 'profile', label: '基本資料' },
+  { key: 'visits', label: '看診紀錄' },
+  { key: 'history', label: '修改紀錄' },
+]
+
+// Every tab stays mounted (just hidden) so switching tabs keeps unsaved form input.
+function Section({ title, action, hidden, children }) {
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+    <section hidden={hidden} role="tabpanel" className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
       <div className="mb-5 flex items-center justify-between">
         <h2 className="font-semibold">{title}</h2>
         {action}
@@ -25,6 +34,9 @@ function Section({ title, action, children }) {
 export default function PatientDetailPage() {
   const id = Number(useParams().id)
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const requested = searchParams.get('tab')
+  const tab = TABS.some((t) => t.key === requested) ? requested : 'recall'
   const query = usePatient(id)
   const updatePatient = useUpdatePatient()
   const deletePatient = useDeletePatient()
@@ -40,17 +52,24 @@ export default function PatientDetailPage() {
   const latestVisit = patient.visits[0]
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <Link to="/patients" className="text-sm text-slate-500 hover:text-orange-700">← 病患清單</Link>
+          <Link to="/patients" className="text-sm text-slate-500 hover:text-orange-700">← 病患名冊</Link>
           <h1 className="mt-3 text-2xl font-semibold">{patient.name}</h1>
         </div>
         <Button variant="ghost" onClick={() => setConfirming('patient')}>刪除病患</Button>
       </div>
 
+      <TabBar
+        tabs={TABS}
+        active={tab}
+        onChange={(key) => setSearchParams(key === 'recall' ? {} : { tab: key }, { replace: true })}
+      />
+
       <Section
         title="目前回診追蹤"
+        hidden={tab !== 'recall'}
         action={<Button disabled={recordVisit.isPending} onClick={() => recordVisit.mutate({ patientId: id })}>登記今日看診</Button>}
       >
         {recall ? (
@@ -63,7 +82,7 @@ export default function PatientDetailPage() {
         )}
       </Section>
 
-      <Section title="基本資料">
+      <Section title="基本資料" hidden={tab !== 'profile'}>
         <PatientForm
           key={patient.updatedAt}
           initial={patient}
@@ -74,7 +93,7 @@ export default function PatientDetailPage() {
         />
       </Section>
 
-      <Section title="看診紀錄">
+      <Section title="看診紀錄" hidden={tab !== 'visits'}>
         {patient.visits.length === 0 ? (
           <p className="text-slate-500">尚無看診紀錄</p>
         ) : (
@@ -91,20 +110,23 @@ export default function PatientDetailPage() {
         )}
       </Section>
 
-      <details className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <summary className="cursor-pointer font-semibold">修改紀錄（{patient.events.length}）</summary>
-        <ul className="mt-5 space-y-4">
-          {patient.events.map((event) => {
-            const { title, lines } = describeEvent(event)
-            return (
-              <li key={event.id} className="text-sm">
-                <p><span className="font-medium">{title}</span><span className="ml-3 text-slate-400">{formatDateTime(event.createdAt)}</span></p>
-                {lines.map((line) => <p key={line} className="mt-1 text-slate-600">{line}</p>)}
-              </li>
-            )
-          })}
-        </ul>
-      </details>
+      <Section title={`修改紀錄（${patient.events.length}）`} hidden={tab !== 'history'}>
+        {patient.events.length === 0 ? (
+          <p className="text-slate-500">尚無修改紀錄</p>
+        ) : (
+          <ul className="space-y-4">
+            {patient.events.map((event) => {
+              const { title, lines } = describeEvent(event)
+              return (
+                <li key={event.id} className="text-sm">
+                  <p><span className="font-medium">{title}</span><span className="ml-3 text-slate-400">{formatDateTime(event.createdAt)}</span></p>
+                  {lines.map((line) => <p key={line} className="mt-1 text-slate-600">{line}</p>)}
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </Section>
 
       {confirming === 'patient' && (
         <ConfirmDialog

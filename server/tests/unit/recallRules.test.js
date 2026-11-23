@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  nextAction, overdueDays, buildTodayItems, applyAction, applyManualEdit, canRestart, restartFields, snapshot,
+  nextAction, overdueDays, buildTodayItems, completedToday, applyAction, applyManualEdit, canRestart, restartFields, snapshot,
 } from '../../src/domain/recallRules.js'
 
 const SETTINGS = { recallIntervalMonths: 6, lineLeadDays: 7, callAfterLineDays: 3, callGapDays: 2 }
@@ -57,16 +57,34 @@ describe('buildTodayItems', () => {
   const item = (name, overrides, hasLine = true) =>
     ({ ...recall(overrides), patient: { id: 1, name, phoneNumber: '0912345678', hasLine } })
 
-  it('includes items due today and excludes future, confirmed and on-hold ones', () => {
+  it('includes items due today and excludes future, earlier-confirmed and on-hold ones', () => {
     const items = [
       item('今天', { dueDate: '2026-10-13' }),
       item('明天', { dueDate: '2026-10-14' }),
-      item('已確認', { dueDate: '2026-10-13', status: 'CONFIRMED' }),
+      item('已確認', { dueDate: '2026-10-13', status: 'CONFIRMED', confirmedAt: '2026-10-01' }),
       item('暫停', { dueDate: '2026-09-01', onHold: true }),
+      item('暫停但今天有日期', { dueDate: '2026-09-01', onHold: true, lineSentAt: TODAY }),
     ]
     const result = buildTodayItems(items, SETTINGS, TODAY)
     expect(result.map((i) => i.patient.name)).toEqual(['今天'])
-    expect(result[0].nextAction).toEqual({ action: 'SEND_LINE', actionDate: TODAY, overdueDays: 0 })
+    expect(result[0]).toMatchObject({
+      haveAction: true, completedToday: null, waiting: false, nextAction: { action: 'SEND_LINE', actionDate: TODAY, overdueDays: 0 },
+    })
+  })
+
+  it('keeps items acted on today, marked done, after the to-do items', () => {
+    const items = [
+      item('今天確認', { dueDate: '2026-10-08', status: 'CONFIRMED', confirmedAt: TODAY }),
+      item('今天傳LINE', { dueDate: '2026-10-13', step: 'LINE_SENT', lineSentAt: TODAY }),
+      item('待傳', { dueDate: '2026-10-20', step: 'NOT_CONTACTED' }, true),
+      item('逾期', { dueDate: '2026-10-10' }),
+    ]
+    const result = buildTodayItems(items, SETTINGS, TODAY)
+    expect(result.map((i) => [i.patient.name, i.haveAction, i.completedToday])).toEqual([
+      ['逾期', true, null],
+      ['今天確認', false, 'CONFIRMED'],
+      ['今天傳LINE', false, 'LINE'],
+    ])
   })
 
   it('sorts by countdown: the earliest due date first, whatever the step', () => {
@@ -90,6 +108,38 @@ describe('buildTodayItems', () => {
     const names = buildTodayItems(items, SETTINGS, TODAY).map((i) => i.patient.name)
     // zh-Hant-TW collates by stroke count: 乙 (1 stroke) before 甲 (5).
     expect(names).toEqual(['第2次', '第1次', '乙', '甲'])
+  })
+
+  it('lists contacted patients whose next step is not due yet as waiting, last, soonest step first', () => {
+    const items = [
+      item('後天打', { step: 'LINE_SENT', lineSentAt: '2026-10-05', dueDate: '2026-10-12' }),
+      item('明天打', { step: 'CALLED_1', call1At: '2026-10-05', dueDate: '2026-10-15' }),
+      item('今天傳', { step: 'LINE_SENT', lineSentAt: TODAY, dueDate: '2026-10-13' }),
+      item('該打了', { step: 'LINE_SENT', lineSentAt: '2026-10-03', dueDate: '2026-10-20' }),
+      item('還沒聯絡', { dueDate: '2026-10-20' }),
+      item('已確認', { step: 'LINE_SENT', lineSentAt: '2026-10-05', status: 'CONFIRMED', confirmedAt: '2026-10-05' }),
+    ]
+    const result = buildTodayItems(items, SETTINGS, TODAY)
+    expect(result.map((i) => [i.patient.name, i.haveAction, i.completedToday, i.waiting])).toEqual([
+      ['該打了', true, null, false],
+      ['今天傳', false, 'LINE', false],
+      ['明天打', false, null, true],
+      ['後天打', false, null, true],
+    ])
+    expect(result[2].nextAction).toMatchObject({ action: 'CALL_2', actionDate: '2026-10-07' })
+  })
+})
+
+describe('completedToday', () => {
+  const TODAY = '2026-10-06'
+
+  it('reports the latest contact made today', () => {
+    expect(completedToday(recall({ call2At: TODAY, call3At: TODAY }), TODAY)).toBe('CALL_3')
+    expect(completedToday(recall({ lineSentAt: TODAY, confirmedAt: TODAY }), TODAY)).toBe('CONFIRMED')
+    expect(completedToday(recall({ call1At: TODAY }), TODAY)).toBe('CALL_1')
+  })
+  it('ignores contacts from earlier days', () => {
+    expect(completedToday(recall({ lineSentAt: '2026-10-05', confirmedAt: '2026-10-01' }), TODAY)).toBeNull()
   })
 })
 
@@ -124,6 +174,10 @@ describe('applyAction', () => {
   it('confirms from any step', () => {
     expect(applyAction(recall({ step: 'CALLED_2' }), true, 'CONFIRM', TODAY))
       .toEqual({ status: 'CONFIRMED', confirmedAt: TODAY })
+  })
+  it('sets the agreed appointment date when confirming with one', () => {
+    expect(applyAction(recall(), true, 'CONFIRM', TODAY, { dueDate: '2026-12-03' }))
+      .toEqual({ status: 'CONFIRMED', confirmedAt: TODAY, dueDate: '2026-12-03' })
   })
   it.each([[{ status: 'CONFIRMED' }], [{ status: 'UNREACHABLE' }], [{ onHold: true }]])(
     'refuses every action when %o', (overrides) => {

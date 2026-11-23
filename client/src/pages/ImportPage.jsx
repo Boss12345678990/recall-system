@@ -99,7 +99,7 @@ export default function ImportPage() {
           {commit.data.onHold > 0 && (
             <p className="mt-2 text-sm text-slate-600">
               其中 {commit.data.onHold} 筆回診日已過，放在
-              <Link to="/?tab=import-overdue" className="mx-1 text-orange-700 underline">待重新追蹤</Link>
+              <Link to="/?tab=import-overdue" className="mx-1 text-orange-700 underline">聯絡不上</Link>
               清單，有空時再逐一重新追蹤。
             </p>
           )}

@@ -1,5 +1,5 @@
 import { prisma } from '../lib/prisma.js'
-import { startOfClinicDay, todayInClinic } from '../lib/dates.js'
+import { fromDbDate, toDbDate, todayInClinic } from '../lib/dates.js'
 import { ConflictError, NotFoundError, ValidationError } from '../errors/AppError.js'
 import { recallFromDb, recallFieldsToDb } from '../mappers/recall.mapper.js'
 import {
@@ -12,7 +12,11 @@ const LIST_QUERIES = {
   waiting: { where: { status: 'PENDING', onHold: false, step: { not: 'NOT_CONTACTED' } }, orderBy: [{ dueDate: 'asc' }, { id: 'asc' }] },
   confirmed: { where: { status: 'CONFIRMED' }, orderBy: [{ dueDate: 'asc' }, { id: 'asc' }] },
   unreachable: { where: { status: 'UNREACHABLE' }, orderBy: [{ dueDate: 'asc' }, { id: 'asc' }] },
-  'import-overdue': { where: { onHold: true, status: 'PENDING' }, orderBy: [{ dueDate: 'asc' }, { id: 'asc' }] },
+  // The 聯絡不上 tab: every unreachable patient, plus imports held because they were past due.
+  'import-overdue': {
+    where: { OR: [{ onHold: true, status: 'PENDING' }, { status: 'UNREACHABLE' }] },
+    orderBy: [{ dueDate: 'asc' }, { id: 'asc' }],
+  },
 }
 
 // "Waiting for a reply" also needs the next step to be not yet due, which only the recall rules know.
@@ -20,9 +24,16 @@ const LIST_FILTERS = {
   waiting: (item, today) => item.nextAction !== null && item.nextAction.actionDate > today,
 }
 
+const RECALL_INCLUDE = { patient: true, visit: { select: { visitDate: true } } }
+
+// `visitDate` is the visit this recall cycle was created from (the patient's last visit).
 function toRecallWithPatient(row) {
   const { id, name, phoneNumber, hasLine, comment } = row.patient
-  return { ...recallFromDb(row), patient: { id, name, phoneNumber, hasLine, comment } }
+  return {
+    ...recallFromDb(row),
+    visitDate: row.visit ? fromDbDate(row.visit.visitDate) : null,
+    patient: { id, name, phoneNumber, hasLine, comment },
+  }
 }
 
 function staleError() {
@@ -30,7 +41,7 @@ function staleError() {
 }
 
 async function loadList(list, settings, today) {
-  const rows = await prisma.recall.findMany({ ...LIST_QUERIES[list], include: { patient: true } })
+  const rows = await prisma.recall.findMany({ ...LIST_QUERIES[list], include: RECALL_INCLUDE })
   const items = rows.map((row) => withNextAction(toRecallWithPatient(row), row.patient.hasLine, settings, today))
   const keep = LIST_FILTERS[list]
   return keep ? items.filter((item) => keep(item, today)) : items
@@ -42,30 +53,34 @@ async function countLists(settings, today) {
   return Object.fromEntries(lists.map((list, index) => [list, lengths[index]]))
 }
 
-// Recalls with a contact recorded today that are no longer waiting in the to-do list.
-async function countHandledToday(today, remainingIds) {
-  const handled = await prisma.recallEvent.findMany({
-    where: { type: 'ACTION', createdAt: { gte: startOfClinicDay(today) } },
-    distinct: ['recallId'],
-    select: { recallId: true },
-  })
-  return handled.filter(({ recallId }) => !remainingIds.has(recallId)).length
+// Pending recalls, plus any recall (confirmed or unreachable too) with a contact recorded today.
+function todayListWhere(today) {
+  const day = toDbDate(today)
+  return {
+    onHold: false,
+    OR: [
+      { status: 'PENDING' },
+      ...['lineSentAt', 'call1At', 'call2At', 'call3At', 'confirmedAt'].map((field) => ({ [field]: day })),
+    ],
+  }
 }
 
 export async function getToday() {
   const today = todayInClinic()
   const settings = await getSettings()
   const [rows, counts] = await Promise.all([
-    prisma.recall.findMany({ where: { status: 'PENDING', onHold: false }, include: { patient: true } }),
+    prisma.recall.findMany({ where: todayListWhere(today), include: RECALL_INCLUDE }),
     countLists(settings, today),
   ])
   const items = buildTodayItems(rows.map(toRecallWithPatient), settings, today)
-  const overdue = items.filter((item) => item.nextAction.overdueDays > 0).length
-  const done = await countHandledToday(today, new Set(items.map((item) => item.id)))
+  const todo = items.filter((item) => item.haveAction)
+  const overdue = todo.filter((item) => item.nextAction.overdueDays > 0).length
+  // Waiting rows are shown but are not today's work, so 今日進度 = done / (done + to do).
+  const done = items.filter((item) => item.completedToday).length
   return {
     today,
-    summary: { total: items.length, overdue },
-    progress: { done, total: done + items.length },
+    summary: { total: todo.length, overdue },
+    progress: { done, total: done + todo.length },
     counts,
     items,
   }
@@ -78,7 +93,7 @@ export async function getList(list) {
 }
 
 async function loadForUpdate(tx, id, version) {
-  const row = await tx.recall.findUnique({ where: { id }, include: { patient: true } })
+  const row = await tx.recall.findUnique({ where: { id }, include: RECALL_INCLUDE })
   if (!row) throw new NotFoundError('RECALL_NOT_FOUND', '找不到這筆回診追蹤')
   if (row.version !== version) throw staleError()
   return row
@@ -99,16 +114,17 @@ async function writeChange(tx, row, fields, event) {
 }
 
 async function result(tx, id, eventId, today) {
-  const row = await tx.recall.findUnique({ where: { id }, include: { patient: true } })
+  const row = await tx.recall.findUnique({ where: { id }, include: RECALL_INCLUDE })
   const settings = await getSettings(tx)
   return { recall: withNextAction(toRecallWithPatient(row), row.patient.hasLine, settings, today), eventId }
 }
 
-export async function recordAction(id, { action, version }) {
+export async function recordAction(id, { action, dueDate, version }) {
   const today = todayInClinic()
+  if (dueDate && dueDate < today) throw new ValidationError('DUE_DATE_IN_PAST', '回診日不可早於今天')
   return prisma.$transaction(async (tx) => {
     const row = await loadForUpdate(tx, id, version)
-    const patch = applyAction(recallFromDb(row), row.patient.hasLine, action, today)
+    const patch = applyAction(recallFromDb(row), row.patient.hasLine, action, today, { dueDate })
     if (!patch) throw new ConflictError('ACTION_NOT_ALLOWED', '目前的步驟無法執行這個動作，請重新整理')
     const eventId = await writeChange(tx, row, patch, { type: 'ACTION', action })
     return result(tx, id, eventId, today)

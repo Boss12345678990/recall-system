@@ -3,6 +3,8 @@ const VARIANTS = {
   success: 'bg-green-700 text-white hover:bg-green-800',
   secondary: 'border border-slate-300 bg-white text-slate-700 hover:bg-slate-50',
   danger: 'bg-red-600 text-white hover:bg-red-700',
+  // A muted red for routine warnings (e.g. recording an unanswered call), not destructive actions.
+  softDanger: 'border border-red-200 bg-red-50 text-red-700 hover:bg-red-100',
   ghost: 'text-slate-500 hover:text-slate-800',
 }
 

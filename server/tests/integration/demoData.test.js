@@ -14,7 +14,8 @@ describe('seedDemoData', () => {
   it('fills today\'s list in urgency order and every secondary list', async () => {
     await seedDemoData()
     const { data } = (await agent.get('/api/recalls/today').expect(200)).body
-    expect(data.items.map((i) => [i.patient.name, i.nextAction.action, i.nextAction.overdueDays])).toEqual([
+    const todo = data.items.filter((i) => i.haveAction)
+    expect(todo.map((i) => [i.patient.name, i.nextAction.action, i.nextAction.overdueDays])).toEqual([
       ['吳雅婷', 'CALL_3', 2],
       ['黃建國', 'CALL_2', 0],
       ['李美玲', 'CALL_1', 1],
@@ -24,7 +25,7 @@ describe('seedDemoData', () => {
       ['林志明', 'SEND_LINE', 0],
     ])
     expect(data.summary).toEqual({ total: 7, overdue: 3 })
-    expect(data.counts).toEqual({ waiting: 2, confirmed: 2, unreachable: 1, 'import-overdue': 2 })
+    expect(data.counts).toEqual({ waiting: 2, confirmed: 2, unreachable: 1, 'import-overdue': 3 })
   })
 
   it('records a history event for every contact so the detail page has something to show', async () => {

@@ -10,7 +10,17 @@ export const listSchema = requestSchema({ query: z.object({ list: z.enum(RECALL_
 
 export const actionSchema = requestSchema({
   params: idParams,
-  body: z.object({ action: z.enum(['LINE_SENT', 'CALL_NO_ANSWER', 'CONFIRM']), version }).strict(),
+  // Confirming asks staff for the appointment date the patient agreed to; other actions take no date.
+  body: z.object({ action: z.enum(['LINE_SENT', 'CALL_NO_ANSWER', 'CONFIRM']), dueDate: dateString.optional(), version })
+    .strict()
+    .superRefine((body, ctx) => {
+      if (body.action === 'CONFIRM' && body.dueDate === undefined) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['dueDate'], message: '請選擇回診日' })
+      }
+      if (body.action !== 'CONFIRM' && body.dueDate !== undefined) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['dueDate'], message: '只有確認複診需要回診日' })
+      }
+    }),
 })
 
 export const undoSchema = requestSchema({

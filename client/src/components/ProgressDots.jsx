@@ -7,7 +7,7 @@ function dotTitle(step, date, skipped) {
 }
 
 // One dot per contact step (LINE → call 1 → 2 → 3); hovering a dot shows its date.
-// `compact` is the small inline version used in table rows.
+// `compact` is the small inline version used in table rows, where ProgressPopover shows the dates instead.
 export default function ProgressDots({ recall, hasLine, compact = false }) {
   const steps = PROGRESS_STEPS.map((step) => {
     const date = recall[step.field]
@@ -18,10 +18,9 @@ export default function ProgressDots({ recall, hasLine, compact = false }) {
   if (compact) {
     return (
       <ol className="flex items-center gap-1" aria-label="聯絡進度">
-        {steps.map(({ step, date, skipped, title }) => (
+        {steps.map(({ step, date, skipped }) => (
           <li key={step.key}>
             <span
-              title={title}
               data-done={Boolean(date)}
               className={`block h-2 w-2 rounded-full ${date ? 'bg-orange-500' : skipped ? 'border border-dashed border-slate-300' : 'bg-orange-100'}`}
             />

@@ -1,11 +1,22 @@
 import { describe, it, expect } from 'vitest'
-import { countdown, lastContact, primaryAction, stageLabel, rescheduleOptions, formatLongDate } from './recallDisplay.js'
+import { completedLabel, countdown, lastContact, primaryAction, stageLabel, formatLongDate, waitingLabel } from './recallDisplay.js'
 
 const TODAY = '2026-10-08'
 const recall = (overrides) => ({
   step: 'NOT_CONTACTED', status: 'PENDING', onHold: false, dueDate: '2026-10-15',
   lineSentAt: null, call1At: null, call2At: null, call3At: null, confirmedAt: null, nextAction: null,
   ...overrides,
+})
+
+describe('completedLabel', () => {
+  it.each([
+    ['LINE', '已傳 LINE'],
+    ['CALL_1', '第 1 通未接'],
+    ['CALL_3', '第 3 通未接'],
+    ['CONFIRMED', '確認複診'],
+  ])('labels %s as %s', (kind, label) => {
+    expect(completedLabel(kind)).toBe(label)
+  })
 })
 
 describe('countdown', () => {
@@ -52,20 +63,16 @@ describe('stageLabel', () => {
   })
   it('falls back to the status', () => {
     expect(stageLabel(recall({ status: 'UNREACHABLE' }))).toBe('聯絡不上')
-    expect(stageLabel(recall({ onHold: true }))).toBe('待重新追蹤')
+    expect(stageLabel(recall({ onHold: true }))).toBe('匯入時已過期')
   })
 })
 
-describe('rescheduleOptions', () => {
-  it('postpones from the due date when it is still ahead', () => {
-    expect(rescheduleOptions('2026-10-15', TODAY)).toEqual([
-      { label: '延後 1 週', date: '2026-10-22' },
-      { label: '延後 2 週', date: '2026-10-29' },
-      { label: '延後 1 個月', date: '2026-11-15' },
-    ])
-  })
-  it('postpones from today when the due date has passed', () => {
-    expect(rescheduleOptions('2026-10-01', TODAY)[0]).toEqual({ label: '延後 1 週', date: '2026-10-15' })
+describe('waitingLabel', () => {
+  const waiting = (action, actionDate) => ({ nextAction: { action, actionDate, overdueDays: 0 } })
+  it('says when the next call is', () => {
+    expect(waitingLabel(waiting('CALL_1', '2026-10-09'), '2026-10-08')).toBe('等待回覆・明天打第 1 通')
+    expect(waitingLabel(waiting('CALL_2', '2026-10-10'), '2026-10-08')).toBe('等待回覆・後天打第 2 通')
+    expect(waitingLabel(waiting('CALL_3', '2026-10-11'), '2026-10-08')).toBe('等待回覆・3 天後打第 3 通')
   })
 })
 

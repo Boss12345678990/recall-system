@@ -53,7 +53,7 @@ export default function Layout() {
               今日待辦
               {todoCount > 0 && <span className="rounded-full bg-orange-500 px-1.5 text-xs font-semibold text-white">{todoCount}</span>}
             </NavLink>
-            <NavLink to="/patients" className={navClass}>病患清單</NavLink>
+            <NavLink to="/patients" className={navClass}>病患名冊</NavLink>
           </nav>
           <div className="ml-auto">
             <DropdownMenu

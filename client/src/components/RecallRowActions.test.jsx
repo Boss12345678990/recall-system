@@ -12,7 +12,7 @@ const item = (overrides = {}) => ({
 })
 
 function setup(props = {}) {
-  const handlers = { onAction: vi.fn(), onReschedule: vi.fn(), onMarkUnreachable: vi.fn() }
+  const handlers = { onAction: vi.fn(), onReschedule: vi.fn() }
   renderWithProviders(<RecallRowActions item={item()} today={TODAY} {...handlers} {...props} />)
   return handlers
 }
@@ -20,49 +20,89 @@ function setup(props = {}) {
 const buttonLabels = () => screen.getAllByRole('button').map((button) => button.textContent)
 
 describe('RecallRowActions', () => {
-  it('offers the next call, confirm, 改約 and more', () => {
+  it('offers only the next call and confirm while the patient is being contacted', () => {
     setup()
-    expect(buttonLabels()).toEqual(['第 3 通未接', '✓ 確認', '改約 ▾', '···'])
+    expect(buttonLabels()).toEqual(['第 3 通未接', '✓ 確認回診'])
   })
 
-  it('reports the contact and confirm actions', () => {
+  it('shows unanswered-call buttons in soft red', () => {
+    setup()
+    expect(screen.getByRole('button', { name: '第 3 通未接' }).className).toContain('bg-red-50')
+  })
+
+  it('keeps 已傳 LINE in the plain style', () => {
+    setup({ item: item({ step: 'NOT_CONTACTED', lineSentAt: null, call1At: null, call2At: null }) })
+    expect(screen.getByRole('button', { name: '已傳 LINE' }).className).toContain('border-slate-300')
+  })
+
+  it('reports the contact action', () => {
     const { onAction } = setup()
     fireEvent.click(screen.getByRole('button', { name: '第 3 通未接' }))
-    fireEvent.click(screen.getByRole('button', { name: '✓ 確認' }))
-    expect(onAction.mock.calls).toEqual([['CALL_NO_ANSWER'], ['CONFIRM']])
+    expect(onAction.mock.calls).toEqual([['CALL_NO_ANSWER']])
   })
 
-  it('reschedules from a preset or a custom date', () => {
-    const { onReschedule } = setup()
-    fireEvent.click(screen.getByRole('button', { name: '改約 ▾' }))
-    fireEvent.click(screen.getByRole('menuitem', { name: '延後 1 週' }))
+  it('asks for the agreed appointment date before confirming, starting from the expected one', () => {
+    const { onAction } = setup()
+    fireEvent.click(screen.getByRole('button', { name: '✓ 確認回診' }))
+    const dateInput = screen.getByLabelText(/確認的回診日/)
+    expect(dateInput).toHaveValue('2026-10-15')
+    fireEvent.change(dateInput, { target: { value: '2026-10-20' } })
+    fireEvent.click(screen.getByRole('button', { name: '✓ 確認複診' }))
+    expect(onAction.mock.calls).toEqual([['CONFIRM', { dueDate: '2026-10-20' }]])
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('does not confirm when the date dialog is cancelled', () => {
+    const { onAction } = setup()
+    fireEvent.click(screen.getByRole('button', { name: '✓ 確認回診' }))
+    fireEvent.click(screen.getByRole('button', { name: '取消' }))
+    expect(onAction).not.toHaveBeenCalled()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('offers only 改約 for a confirmed patient', () => {
+    setup({ item: item({ status: 'CONFIRMED', confirmedAt: '2026-10-06' }), showPrimary: false })
+    expect(buttonLabels()).toEqual(['改約 ▾'])
+  })
+
+  it('reschedules a confirmed patient to the date staff pick', () => {
+    const { onReschedule } = setup({ item: item({ status: 'CONFIRMED', confirmedAt: '2026-10-06' }) })
     fireEvent.click(screen.getByRole('button', { name: '改約 ▾' }))
     fireEvent.change(screen.getByLabelText('自訂日期'), { target: { value: '2026-12-01' } })
     fireEvent.click(screen.getByRole('button', { name: '確定' }))
-    expect(onReschedule.mock.calls).toEqual([['2026-10-22'], ['2026-12-01']])
+    expect(onReschedule.mock.calls).toEqual([['2026-12-01']])
   })
 
-  it('marks the patient unreachable from the more menu', () => {
-    const { onMarkUnreachable } = setup()
-    fireEvent.click(screen.getByRole('button', { name: '···' }))
-    fireEvent.click(screen.getByRole('menuitem', { name: '標記為聯絡不上' }))
-    expect(onMarkUnreachable).toHaveBeenCalledOnce()
+  it('offers only 重新追蹤 for a 聯絡不上 patient', () => {
+    setup({ item: item({ step: 'CALLED_3', status: 'UNREACHABLE', call3At: '2026-10-07' }), showPrimary: false })
+    expect(buttonLabels()).toEqual(['重新追蹤 ▾'])
   })
 
-  it('opens the patient from the more menu', () => {
-    setup()
-    fireEvent.click(screen.getByRole('button', { name: '···' }))
-    fireEvent.click(screen.getByRole('menuitem', { name: '查看病患資料' }))
-    expect(screen.getByText('病患詳細頁')).toBeInTheDocument()
+  it('offers 重新追蹤 for imports held because they were past due', () => {
+    setup({ item: item({ step: 'NOT_CONTACTED', onHold: true, lineSentAt: null, call1At: null, call2At: null }), showPrimary: false })
+    expect(buttonLabels()).toEqual(['重新追蹤 ▾'])
   })
 
-  it('offers 重新追蹤 instead of contact buttons for unreachable recalls', () => {
-    setup({ item: item({ step: 'CALLED_3', status: 'UNREACHABLE' }) })
-    expect(buttonLabels()).toEqual(['重新追蹤 ▾', '···'])
+  it('offers only confirm for a patient waiting for their next step', () => {
+    setup({ item: item({ waiting: true, haveAction: false }) })
+    expect(buttonLabels()).toEqual(['✓ 確認回診'])
   })
 
-  it('can hide the contact button (waiting tab)', () => {
-    setup({ showPrimary: false })
-    expect(buttonLabels()).toEqual(['✓ 確認', '改約 ▾', '···'])
+  it('keeps confirm on a row contacted today, for a patient who replies the same day', () => {
+    const { onAction } = setup({ item: item({ step: 'LINE_SENT', completedToday: 'LINE', haveAction: false }) })
+    expect(screen.getByText('✓ 今日已完成・已傳 LINE')).toBeInTheDocument()
+    expect(buttonLabels()).toEqual(['✓ 確認回診'])
+    fireEvent.click(screen.getByRole('button', { name: '✓ 確認回診' }))
+    fireEvent.click(screen.getByRole('button', { name: '✓ 確認複診' }))
+    expect(onAction.mock.calls).toEqual([['CONFIRM', { dueDate: '2026-10-15' }]])
+  })
+
+  it.each([
+    ['confirmed today', { status: 'CONFIRMED', confirmedAt: TODAY, completedToday: 'CONFIRMED' }, '✓ 今日已完成・確認複診'],
+    ['unreachable after the third call', { step: 'CALLED_3', status: 'UNREACHABLE', call3At: TODAY, completedToday: 'CALL_3' }, '✓ 今日已完成・第 3 通未接'],
+  ])('shows a row %s as finished, with no buttons', (_, overrides, label) => {
+    setup({ item: item({ haveAction: false, ...overrides }) })
+    expect(screen.getByText(label)).toBeInTheDocument()
+    expect(screen.queryAllByRole('button')).toEqual([])
   })
 })

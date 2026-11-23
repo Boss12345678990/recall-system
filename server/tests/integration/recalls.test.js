@@ -39,14 +39,57 @@ describe('GET /api/recalls/today', () => {
     expect(data.progress).toEqual({ done: 0, total: 3 })
   })
 
-  it('counts recalls handled today in progress after they leave the to-do list', async () => {
-    const recall = await patientWithRecall({ dueDate: addDays(today, 7) })
-    await patientWithRecall({ dueDate: addDays(today, 7) })
+  it('keeps recalls handled today on the list, marked done, after the to-do ones', async () => {
+    const recall = await patientWithRecall({ dueDate: addDays(today, 7) }, { name: '甲' })
+    await patientWithRecall({ dueDate: addDays(today, 7) }, { name: '乙' })
     await agent.post(`/api/recalls/${recall.id}/actions`).send({ action: 'LINE_SENT', version: 0 }).expect(200)
     const { data } = (await agent.get('/api/recalls/today').expect(200)).body
-    expect(data.items).toHaveLength(1)
+    expect(data.items.map((i) => [i.patient.name, i.haveAction, i.completedToday])).toEqual([
+      ['乙', true, null],
+      ['甲', false, 'LINE'],
+    ])
+    expect(data.summary).toEqual({ total: 1, overdue: 0 })
     expect(data.progress).toEqual({ done: 1, total: 2 })
     expect(data.counts.waiting).toBe(1)
+  })
+
+  it('shows patients waiting for their next step last, without counting them as work', async () => {
+    await patientWithRecall({ dueDate: addDays(today, 7) }, { name: '甲' })
+    await patientWithRecall({ dueDate: addDays(today, 5), step: 'LINE_SENT', lineSentAt: addDays(today, -1) }, { name: '等' })
+    const { data } = (await agent.get('/api/recalls/today').expect(200)).body
+    expect(data.items.map((i) => [i.patient.name, i.haveAction, i.waiting])).toEqual([
+      ['甲', true, false],
+      ['等', false, true],
+    ])
+    expect(data.items[1].nextAction).toEqual({ action: 'CALL_1', actionDate: addDays(today, 2), overdueDays: 0 })
+    expect(data.summary).toEqual({ total: 1, overdue: 0 })
+    expect(data.progress).toEqual({ done: 0, total: 1 })
+  })
+
+  it('keeps a patient confirmed today, and one whose third call made them unreachable', async () => {
+    const confirmed = await patientWithRecall({ dueDate: addDays(today, 7) }, { name: '確認' })
+    const third = await patientWithRecall({
+      dueDate: addDays(today, 1), step: 'CALLED_2', call2At: addDays(today, -2),
+    }, { name: '第三通' })
+    await agent.post(`/api/recalls/${confirmed.id}/actions`)
+      .send({ action: 'CONFIRM', dueDate: addDays(today, 7), version: 0 }).expect(200)
+    await agent.post(`/api/recalls/${third.id}/actions`).send({ action: 'CALL_NO_ANSWER', version: 0 }).expect(200)
+    const { data } = (await agent.get('/api/recalls/today').expect(200)).body
+    expect(data.items.map((i) => [i.patient.name, i.status, i.completedToday])).toEqual([
+      ['第三通', 'UNREACHABLE', 'CALL_3'],
+      ['確認', 'CONFIRMED', 'CONFIRMED'],
+    ])
+    expect(data.progress).toEqual({ done: 2, total: 2 })
+  })
+
+  it('puts an undone action back to a normal to-do row', async () => {
+    const recall = await patientWithRecall({ dueDate: addDays(today, 7) })
+    const acted = (await agent.post(`/api/recalls/${recall.id}/actions`).send({ action: 'LINE_SENT', version: 0 })).body.data
+    await agent.post(`/api/recalls/${recall.id}/undo`).send({ eventId: acted.eventId, version: 1 }).expect(200)
+    const { data } = (await agent.get('/api/recalls/today').expect(200)).body
+    expect(data.items).toHaveLength(1)
+    expect(data.items[0]).toMatchObject({ haveAction: true, completedToday: null })
+    expect(data.progress).toEqual({ done: 0, total: 1 })
   })
 
   it('asks for a call instead of LINE for patients without LINE', async () => {
@@ -69,7 +112,8 @@ describe('GET /api/recalls?list=', () => {
       (await agent.get(`/api/recalls?list=${list}`).expect(200)).body.data.items.map((i) => i.patient.name)
     expect(await names('confirmed')).toEqual(['確認未到', '確認未過期'])
     expect(await names('waiting')).toEqual(['等回覆'])
-    expect(await names('import-overdue')).toEqual(['過期匯入'])
+    // The 聯絡不上 tab gathers held imports and unreachable patients, earliest due date first.
+    expect(await names('import-overdue')).toEqual(['過期匯入', '聯絡不上'])
     expect(await names('unreachable')).toEqual(['聯絡不上'])
   })
 
@@ -87,7 +131,7 @@ describe('POST /api/recalls/:id/actions', () => {
     const event = await prisma.recallEvent.findUnique({ where: { id: res.body.data.eventId } })
     expect(event).toMatchObject({ type: 'ACTION', action: 'LINE_SENT' })
     const todayList = (await agent.get('/api/recalls/today')).body.data
-    expect(todayList.items).toHaveLength(0)
+    expect(todayList.items).toMatchObject([{ haveAction: false, completedToday: 'LINE' }])
   })
 
   it('marks UNREACHABLE on the third unanswered call', async () => {
@@ -96,10 +140,24 @@ describe('POST /api/recalls/:id/actions', () => {
     expect(res.body.data.recall).toMatchObject({ step: 'CALLED_3', call3At: today, status: 'UNREACHABLE', nextAction: null })
   })
 
-  it('confirms', async () => {
+  it('confirms with the appointment date the patient agreed to', async () => {
+    const recall = await patientWithRecall({ dueDate: addDays(today, 7) })
+    const dueDate = addDays(today, 12)
+    const res = await agent.post(`/api/recalls/${recall.id}/actions`).send({ action: 'CONFIRM', dueDate, version: 0 }).expect(200)
+    expect(res.body.data.recall).toMatchObject({ status: 'CONFIRMED', confirmedAt: today, dueDate })
+    const event = await prisma.recallEvent.findUnique({ where: { id: res.body.data.eventId } })
+    expect(event).toMatchObject({ type: 'ACTION', action: 'CONFIRM' })
+    expect(event.after.dueDate).toBe(dueDate)
+  })
+
+  it('requires an appointment date to confirm, and refuses one in the past', async () => {
     const recall = await patientWithRecall()
-    const res = await agent.post(`/api/recalls/${recall.id}/actions`).send({ action: 'CONFIRM', version: 0 }).expect(200)
-    expect(res.body.data.recall).toMatchObject({ status: 'CONFIRMED', confirmedAt: today })
+    const missing = await agent.post(`/api/recalls/${recall.id}/actions`).send({ action: 'CONFIRM', version: 0 }).expect(400)
+    expect(missing.body.error.message).toContain('請選擇回診日')
+    const past = await agent.post(`/api/recalls/${recall.id}/actions`)
+      .send({ action: 'CONFIRM', dueDate: addDays(today, -1), version: 0 }).expect(400)
+    expect(past.body.error.code).toBe('DUE_DATE_IN_PAST')
+    expect((await prisma.recall.findUnique({ where: { id: recall.id } })).status).toBe('PENDING')
   })
 
   it('rejects a second click carrying the same version without recording a second call', async () => {
@@ -119,7 +177,7 @@ describe('POST /api/recalls/:id/actions', () => {
   })
 
   it('returns 404 for a missing recall', async () => {
-    await agent.post('/api/recalls/999999/actions').send({ action: 'CONFIRM', version: 0 }).expect(404)
+    await agent.post('/api/recalls/999999/actions').send({ action: 'CONFIRM', dueDate: today, version: 0 }).expect(404)
   })
 })
 

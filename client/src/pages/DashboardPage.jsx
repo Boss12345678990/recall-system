@@ -4,19 +4,26 @@ import Button from '../components/Button.jsx'
 import PageMessage from '../components/PageMessage.jsx'
 import RecallTable from '../components/RecallTable.jsx'
 import RecallRowActions from '../components/RecallRowActions.jsx'
+import { inputClass } from '../components/Field.jsx'
+import TabBar, { SubTabBar } from '../components/TabBar.jsx'
 import RegisterVisitDialog from '../components/RegisterVisitDialog.jsx'
-import {
-  useMarkUnreachable, useRecallAction, useRecallList, useRestartRecall, useToday,
-} from '../hooks/useRecalls.js'
+import { useRecallAction, useRecallList, useRestartRecall, useToday } from '../hooks/useRecalls.js'
 import { formatLongDate } from '../utils/recallDisplay.js'
 
 export const TABS = [
   { key: 'todo', label: '待辦', empty: '今天沒有需要聯絡的病患' },
-  { key: 'waiting', label: '等待回覆', empty: '目前沒有等待回覆的病患' },
   { key: 'confirmed', label: '已確認', empty: '目前沒有已確認複診的病患' },
-  { key: 'unreachable', label: '無法聯絡', empty: '目前沒有無法聯絡的病患' },
-  { key: 'import-overdue', label: '待重新追蹤', empty: '目前沒有待重新追蹤的病患' },
+  { key: 'import-overdue', label: '聯絡不上', empty: '目前沒有聯絡不上的病患' },
 ]
+
+// The three groups of today's list, as sub-tabs of 待辦.
+export const TODO_VIEWS = [
+  { key: 'todo', label: '待處理', empty: '今天沒有需要聯絡的病患', match: (item) => item.haveAction },
+  { key: 'done', label: '今日已完成', empty: '今天還沒有完成的聯絡', match: (item) => Boolean(item.completedToday) },
+  { key: 'waiting', label: '等待回覆', empty: '目前沒有等待回覆的病患', match: (item) => item.waiting },
+]
+
+const matchesName = (term) => (item) => item.patient.name.includes(term)
 
 const STAT_TONES = {
   plain: { box: 'border-slate-200', value: 'text-slate-900' },
@@ -33,49 +40,28 @@ function StatCard({ label, value, tone = 'plain' }) {
   )
 }
 
-function TabBar({ active, counts, onChange }) {
-  return (
-    <div role="tablist" className="inline-flex flex-wrap gap-1 rounded-xl border border-slate-200 bg-white p-1">
-      {TABS.map((tab) => {
-        const selected = tab.key === active
-        return (
-          <button
-            key={tab.key}
-            type="button"
-            role="tab"
-            aria-selected={selected}
-            onClick={() => onChange(tab.key)}
-            className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm ${selected ? 'font-semibold text-slate-900' : 'text-slate-500 hover:text-slate-800'}`}
-          >
-            {tab.label}
-            <span className={`rounded-full px-1.5 text-xs ${selected ? 'bg-orange-500 text-white' : 'bg-slate-100 text-slate-500'}`}>
-              {counts[tab.key] ?? 0}
-            </span>
-          </button>
-        )
-      })}
-    </div>
-  )
-}
-
 export default function DashboardPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const requested = searchParams.get('tab')
   const tab = TABS.some((t) => t.key === requested) ? requested : 'todo'
+  const requestedView = searchParams.get('view')
+  const view = TODO_VIEWS.find((v) => v.key === requestedView) ?? TODO_VIEWS[0]
+  const [search, setSearch] = useState('')
+  const term = search.trim()
 
   const today = useToday()
   const list = useRecallList(tab, { enabled: tab !== 'todo' })
   const action = useRecallAction()
   const restart = useRestartRecall()
-  const markUnreachable = useMarkUnreachable()
   const [registering, setRegistering] = useState(false)
 
   if (today.isPending) return <PageMessage>載入中…</PageMessage>
   if (today.isError) return <PageMessage tone="error">{today.error.message}</PageMessage>
 
   const { today: date, summary, progress, counts, items } = today.data
-  const sendLine = items.filter((item) => item.nextAction.action === 'SEND_LINE').length
-  const busy = action.isPending || restart.isPending || markUnreachable.isPending
+  const todo = items.filter((item) => item.haveAction)
+  const sendLine = todo.filter((item) => item.nextAction.action === 'SEND_LINE').length
+  const busy = action.isPending || restart.isPending
   const percent = progress.total === 0 ? 0 : Math.round((progress.done / progress.total) * 100)
   const activeTab = TABS.find((t) => t.key === tab)
 
@@ -85,21 +71,33 @@ export default function DashboardPage() {
       today={date}
       showPrimary={tab === 'todo'}
       disabled={busy}
-      onAction={(selected) => action.mutate({ id: item.id, action: selected, version: item.version })}
+      onAction={(selected, extra) => action.mutate({ id: item.id, action: selected, version: item.version, ...extra })}
       onReschedule={(dueDate) => restart.mutate({ id: item.id, dueDate, version: item.version })}
-      onMarkUnreachable={() => markUnreachable.mutate({ id: item.id, version: item.version })}
     />
   )
 
+  // While searching, sub-tab counts show matches, so staff can see which group the patient is in.
+  const searched = term ? items.filter(matchesName(term)) : items
+  const viewCounts = Object.fromEntries(TODO_VIEWS.map((v) => [v.key, searched.filter(v.match).length]))
+  const filterRows = (rows, emptyText) => {
+    if (!term) return { rows, emptyText }
+    return { rows: rows.filter(matchesName(term)), emptyText: `找不到姓名含「${term}」的病患` }
+  }
+
   let body
   if (tab === 'todo') {
-    body = <RecallTable items={items} today={date} renderActions={renderActions} emptyText={activeTab.empty} />
+    const { rows, emptyText } = filterRows(items.filter(view.match), view.empty)
+    body = <RecallTable items={rows} today={date} renderActions={renderActions} emptyText={emptyText} />
   } else if (list.isPending) {
     body = <PageMessage>載入中…</PageMessage>
   } else if (list.isError) {
     body = <PageMessage tone="error">{list.error.message}</PageMessage>
   } else {
-    body = <RecallTable items={list.data.items} today={date} renderActions={renderActions} emptyText={activeTab.empty} />
+    const { rows, emptyText } = filterRows(list.data.items, activeTab.empty)
+    body = (
+      <RecallTable items={rows} today={date} renderActions={renderActions} emptyText={emptyText}
+        compact={tab === 'confirmed'} />
+    )
   }
 
   return (
@@ -112,11 +110,6 @@ export default function DashboardPage() {
             <Button variant="secondary" size="sm" onClick={() => setRegistering(true)}>＋ 登記今日看診</Button>
           </div>
         </div>
-        <div className="flex gap-3">
-          <StatCard label="待傳 LINE" value={sendLine} />
-          <StatCard label="待撥電話" value={items.length - sendLine} tone="orange" />
-          <StatCard label="逾期未確認" value={summary.overdue} tone="red" />
-        </div>
       </div>
 
       <div className="flex items-center gap-4 text-sm text-slate-500">
@@ -126,11 +119,28 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <TabBar
-        active={tab}
-        counts={{ todo: summary.total, ...counts }}
-        onChange={(key) => setSearchParams(key === 'todo' ? {} : { tab: key })}
-      />
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <TabBar
+          tabs={TABS}
+          active={tab}
+          counts={{ todo: summary.total, ...counts }}
+          onChange={(key) => setSearchParams(key === 'todo' ? {} : { tab: key })}
+        />
+        <label className="w-full sm:w-64">
+          <span className="sr-only">搜尋病患姓名</span>
+          <input type="search" className={inputClass} placeholder="搜尋病患姓名" value={search}
+            onChange={(event) => setSearch(event.target.value)} />
+        </label>
+      </div>
+
+      {tab === 'todo' && (
+        <SubTabBar
+          tabs={TODO_VIEWS}
+          active={view.key}
+          counts={viewCounts}
+          onChange={(key) => setSearchParams(key === 'todo' ? {} : { view: key })}
+        />
+      )}
 
       {body}
 

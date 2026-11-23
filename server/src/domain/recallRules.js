@@ -45,11 +45,49 @@ export function compareUrgency(a, b) {
   return a.patient.name.localeCompare(b.patient.name, 'zh-Hant-TW')
 }
 
+// The latest contact recorded today, read from the recall's own dates (so 復原 clears it too).
+const TODAY_CHECKS = [
+  ['confirmedAt', 'CONFIRMED'], ['call3At', 'CALL_3'], ['call2At', 'CALL_2'], ['call1At', 'CALL_1'], ['lineSentAt', 'LINE'],
+]
+
+export function completedToday(recall, today) {
+  const match = TODAY_CHECKS.find(([field]) => recall[field] === today)
+  return match ? match[1] : null
+}
+
+function compareDone(a, b) {
+  if (a.dueDate !== b.dueDate) return a.dueDate < b.dueDate ? -1 : 1
+  return a.patient.name.localeCompare(b.patient.name, 'zh-Hant-TW')
+}
+
+// Soonest next step first, so tomorrow's calls sit above later ones.
+function compareWaiting(a, b) {
+  if (a.nextAction.actionDate !== b.nextAction.actionDate) return a.nextAction.actionDate < b.nextAction.actionDate ? -1 : 1
+  return compareDone(a, b)
+}
+
+// Today's list, in three groups:
+// - to do (haveAction): a contact step is due, most urgent first;
+// - done (completedToday): acted on today, kept on the list as finished;
+// - waiting: contacted before today, next step not due yet. Shown so staff can still
+//   ✓ 確認 a patient who replies in between; they are not part of today's work.
 export function buildTodayItems(items, settings, today) {
-  return items
-    .map((item) => withNextAction(item, item.patient.hasLine, settings, today))
-    .filter((item) => item.nextAction && item.nextAction.actionDate <= today)
-    .sort(compareUrgency)
+  const todo = []
+  const done = []
+  const waiting = []
+  for (const raw of items) {
+    if (raw.onHold) continue
+    const item = withNextAction(raw, raw.patient.hasLine, settings, today)
+    const completed = completedToday(item, today)
+    const next = item.nextAction
+    const haveAction = !completed && next !== null && next.actionDate <= today
+    const isWaiting = !completed && next !== null && next.actionDate > today && item.step !== 'NOT_CONTACTED'
+    const flags = { haveAction, completedToday: completed, waiting: isWaiting }
+    if (completed) done.push({ ...item, ...flags })
+    else if (haveAction) todo.push({ ...item, ...flags })
+    else if (isWaiting) waiting.push({ ...item, ...flags })
+  }
+  return [...todo.sort(compareUrgency), ...done.sort(compareDone), ...waiting.sort(compareWaiting)]
 }
 
 export const MUTABLE_FIELDS = [
@@ -62,9 +100,10 @@ export function snapshot(recall) {
   return Object.fromEntries(MUTABLE_FIELDS.map((field) => [field, recall[field]]))
 }
 
-export function applyAction(recall, hasLine, action, today) {
+// CONFIRM may carry `dueDate`: the appointment date the patient agreed to, replacing the expected one.
+export function applyAction(recall, hasLine, action, today, { dueDate } = {}) {
   if (recall.status !== 'PENDING' || recall.onHold) return null
-  if (action === 'CONFIRM') return { status: 'CONFIRMED', confirmedAt: today }
+  if (action === 'CONFIRM') return { status: 'CONFIRMED', confirmedAt: today, ...(dueDate && { dueDate }) }
   if (action === 'LINE_SENT') {
     return recall.step === 'NOT_CONTACTED' && hasLine ? { step: 'LINE_SENT', lineSentAt: today } : null
   }

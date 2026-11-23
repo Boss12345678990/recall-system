@@ -9,7 +9,7 @@ import ImportPage from './pages/ImportPage.jsx'
 import SettingsPage from './pages/SettingsPage.jsx'
 
 // The old /lists/:list pages are now dashboard tabs.
-const OLD_LIST_TABS = { 'confirmed-no-show': 'confirmed', 'import-overdue': 'import-overdue', unreachable: 'unreachable' }
+const OLD_LIST_TABS = { 'confirmed-no-show': 'confirmed', 'import-overdue': 'import-overdue' }
 
 function OldListRedirect() {
   const tab = OLD_LIST_TABS[useParams().list]

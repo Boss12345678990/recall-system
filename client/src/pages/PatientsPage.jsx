@@ -11,7 +11,7 @@ import { STATUS_LABELS, STEP_LABELS } from '../labels.js'
 import { formatDate, formatPhone } from '../utils/format.js'
 
 const STATUS_FILTERS = [['', '全部狀態'], ['PENDING', '未確認'], ['CONFIRMED', '確認複診'], ['UNREACHABLE', '聯絡不上']]
-const HEADERS = ['病患', '生日', '回診日', '狀態', '提醒進度']
+const HEADERS = ['病患', '生日', '預計回診日', '狀態', '提醒進度']
 
 export default function PatientsPage() {
   const navigate = useNavigate()
@@ -30,7 +30,7 @@ export default function PatientsPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <h1 className="text-2xl font-bold">病患清單</h1>
+        <h1 className="text-2xl font-bold">病患名冊</h1>
         <div className="flex gap-3">
           <Link to="/import" className="whitespace-nowrap rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
             匯入 Excel

@@ -35,7 +35,7 @@ export function useRecallAction() {
     '已復原',
   )
   return useMutation({
-    mutationFn: ({ id, action, version }) => api.post(`/recalls/${id}/actions`, { action, version }),
+    mutationFn: ({ id, action, dueDate, version }) => api.post(`/recalls/${id}/actions`, { action, dueDate, version }),
     onSuccess: ({ recall, eventId }) =>
       toast.show({
         message: '已記錄',
